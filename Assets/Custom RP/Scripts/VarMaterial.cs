@@ -1,18 +1,18 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 public class VarMaterial : MonoBehaviour
 {
-    // Start is called before the first frame update
-    void Start()
-    {
-        
-    }
+    [SerializeField] [ColorUsage(true, true)]
+    private Color _Basecolor;
+    private static MaterialPropertyBlock _materialPropertyBlock;
 
-    // Update is called once per frame
-    void Update()
+    void OnValidate()
     {
-        
-    }
+        if (_materialPropertyBlock == null) _materialPropertyBlock = new MaterialPropertyBlock();
+        _materialPropertyBlock.SetColor(Shader.PropertyToID("_BaseColor"), _Basecolor);
+        GetComponent<Renderer>().SetPropertyBlock(_materialPropertyBlock);
+    } 
 }

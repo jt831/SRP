@@ -21,10 +21,10 @@ public class ShadowProperties
     public TextureSize resolution = TextureSize._1024;
     public PCFMode Fliter = PCFMode.HardShadow;
     [Range(0.01f, 1f)]public float fade = 0.5f;
+    [Range(0.01f, 3f)]public float shadowSlopBias = 0.5f;
     [Range(0.001f, 1f)]public float sampleBlockerDepthRadius = 0.001f;
     [Range(0f, 0.01f)]public float lightWidth = 0.001f;
-
-
+    
     [Serializable]
     public struct Cascade
     {

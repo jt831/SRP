@@ -5,6 +5,7 @@
 #pragma warning (disable : 3205) // conversion of larger type to smaller
 #endif
 
+
 // Convention:
 
 // Unity is Y up and left handed in world space
@@ -1291,7 +1292,7 @@ void ApplyDepthOffsetPositionInput(float3 V, float depthOffsetVS, float3 viewFor
 
 // For the built-in target this is already a defined symbol
 #ifndef BUILTIN_TARGET_API
-real4 PackHeightmap(real height)
+/*real4 PackHeightmap(real height)
 {
     uint a = (uint)(65535.0 * height);
     return real4((a >> 0) & 0xFF, (a >> 8) & 0xFF, 0, 0) / 255.0;
@@ -1300,14 +1301,14 @@ real4 PackHeightmap(real height)
 real UnpackHeightmap(real4 height)
 {
     return (height.r + height.g * 256.0) / 257.0; // (255.0 * height.r + 255.0 * 256.0 * height.g) / 65535.0
-}
+}*/
 #endif
 
 #else
 
 // For the built-in target this is already a defined symbol
 #ifndef BUILTIN_TARGET_API
-real4 PackHeightmap(real height)
+/*real4 PackHeightmap(real height)
 {
     return real4(height, 0, 0, 0);
 }
@@ -1315,7 +1316,7 @@ real4 PackHeightmap(real height)
 real UnpackHeightmap(real4 height)
 {
     return height.r;
-}
+}*/
 #endif
 
 #endif
@@ -1465,4 +1466,13 @@ TEMPLATE_1_REAL(ClampToFloat16Max, value, return min(value, HALF_MAX))
 #pragma warning (enable : 3205) // conversion of larger type to smaller
 #endif
 
+float Square(float input)
+{
+    return pow(input, 2);
+}
+
+float SafeDot(float3 vec1, float3 vec2)
+{
+    return saturate(dot(vec1, vec2));
+}
 #endif // UNITY_COMMON_INCLUDED

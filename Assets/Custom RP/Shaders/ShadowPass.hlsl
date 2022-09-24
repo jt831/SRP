@@ -1,77 +1,52 @@
-#ifndef LIT_PASS_INCLUDED
-#define LIT_PASS_INCLUDED
+#ifndef CUSTOM_SHADOW_CASTER_PASS_INCLUDED
+#define CUSTOM_SHADOW_CASTER_PASS_INCLUDED
 
+#include "UnityCG.cginc"
 
-#include "Assets/Custom RP/Tools/TransformTools.hlsl"
-#include "Assets/Custom RP/Tools/CommonTools.hlsl"
-#include "Assets/Custom RP/Tools/Light.hlsl"
-#include "Assets/Custom RP/Tools/BRDF.hlsl"
-
-TEXTURE2D(_BaseMap);
-SAMPLER(sampler_BaseMap);
-
-CBUFFER_START(UnityPerMaterial)
-float4 _BaseColor;
-float4 _BaseMap_ST;
-float3 _LightColor;
-float3 _LightDirection;
-float3 _CameraPosition;
-float3 _ViewDirection;
-float3 _fresnelTerm;
-float _roughness;
-
-float _AThreshold;
-CBUFFER_END
-
-struct Attributes
-{
+struct Attributes {
     float3 positionOS : POSITION;
-    float3 normalOS   : NORMAL;
-    float2 uv         : TEXCOORD0;
+    float2 baseUV : TEXCOORD0;
+    UNITY_VERTEX_INPUT_INSTANCE_ID
 };
 
-struct v2f
-{
+struct Varyings {
     float4 positionCS : SV_POSITION;
-    float3 positionWS : TEXCOORD0;
-    float3 normalWS   : TEXCOORD1;
-    float2 uv         : TEXCOORD2;
+    float2 baseUV : VAR_BASE_UV;
+    UNITY_VERTEX_INPUT_INSTANCE_ID
 };
 
-v2f LitPassVertex(Attributes input)
-{
-    v2f output;
-    output.positionCS = TransformObjectToHClip(input.positionOS);
-    output.positionWS = TransformObjectToWorld(input.positionOS);
-    output.normalWS   = TransformObjectToWorldNormal(input.normalOS);
-    output.uv = input.uv;
-    
+Varyings ShadowCasterPassVertex (Attributes input) {
+    Varyings output;
+    UNITY_SETUP_INSTANCE_ID(input);
+    UNITY_TRANSFER_INSTANCE_ID(input, output);
+    float3 positionWS = TransformObjectToWorld(input.positionOS);
+    output.positionCS = TransformWorldToHClip(positionWS);
+
+    #if UNITY_REVERSED_Z
+    output.positionCS.z =
+        min(output.positionCS.z, output.positionCS.w * UNITY_NEAR_CLIP_VALUE);
+    #else
+    output.positionCS.z =
+        max(output.positionCS.z, output.positionCS.w * UNITY_NEAR_CLIP_VALUE);
+    #endif
+
+    float4 baseST = UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _BaseMap_ST);
+    output.baseUV = input.baseUV * baseST.xy + baseST.zw;
     return output;
 }
 
-float4 LitPassFragment(v2f input) : SV_Target
-{
-    // Calculate Surface with Light
-    Light light;
-    light.color = _LightColor;
-    light.direction = _LightDirection;
-
-    _ViewDirection = SafeNormalize(_CameraPosition - input.positionWS);
-    _LightDirection = SafeNormalize(_LightDirection);
-    input.normalWS = SafeNormalize(input.normalWS);
-    
-    float4 BaseMap = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv);
-    float4 FinalColor = _BaseColor;
-    
-    #if ENABLE_CLIPPING
-    clip(FinalColor.a - _AThreshold);
+void ShadowCasterPassFragment (Varyings input) {
+    UNITY_SETUP_INSTANCE_ID(input);
+    float4 baseMap = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.baseUV);
+    float4 baseColor = UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _BaseColor);
+    float4 base = baseMap * baseColor;
+    #ifdef ENABLE_CLIPPING
+    clip(base.a - _AThreshold);
     #endif
-    #if ENABLE_BRDF
-    FinalColor.xyz *= BRDF(input.normalWS, _ViewDirection, _LightDirection);
-    return FinalColor;
+    #ifdef LOD_FADE_CROSSFADE
+    float dither = 0;
+    clip(unity_LODFade.x - InterleavedGradientNoise(input.positionCS.xy, 0));
     #endif
-
-    FinalColor = GetSurfaceWithLight(light, input.normalWS, FinalColor);
-    return FinalColor;
 }
+
 #endif

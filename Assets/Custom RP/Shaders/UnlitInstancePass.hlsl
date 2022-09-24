@@ -30,7 +30,7 @@ struct v2f
     UNITY_VERTEX_INPUT_INSTANCE_ID
 };
 
-v2f Vertex (Attributes input)
+v2f UnlitPassInstanceVertex (Attributes input)
 {
     v2f output = (v2f)0;
     UNITY_SETUP_INSTANCE_ID(input);
@@ -41,7 +41,7 @@ v2f Vertex (Attributes input)
     return output;
 }
 
-float4 Fragment(v2f input) : SV_Target
+float4 UnlitPassInstanceFragment(v2f input) : SV_Target
 {
     UNITY_SETUP_INSTANCE_ID(input);
     float4 BaseColor = UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _BaseColor);

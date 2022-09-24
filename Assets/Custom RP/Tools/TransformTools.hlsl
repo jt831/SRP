@@ -1,6 +1,16 @@
-#ifndef UNITY_SPACE_TRANSFORMS_INCLUDED
-#define UNITY_SPACE_TRANSFORMS_INCLUDED
+#include <UnityShaderVariables.cginc>
+#ifndef UNITY_SPACE_TRANSFORMTOOLS_INCLUDED
+#define UNITY_SPACE_TRANSFORMTOOLS_INCLUDED
 
+#define UNITY_MATRIX_M unity_ObjectToWorld
+#define UNITY_MATRIX_I_M unity_WorldToObject
+#define UNITY_MATRIX_V unity_MatrixV
+#define UNITY_MATRIX_VP unity_MatrixVP
+#define UNITY_MATRIX_P glstate_matrix_projection
+#define SafeNormalize normalize
+#define real float
+#define real3 float3
+#define real3x3 float3x3
 #if SHADER_API_MOBILE || SHADER_API_GLES || SHADER_API_GLES3
 #pragma warning (disable : 3205) // conversion of larger type to smaller
 #endif
@@ -16,16 +26,6 @@ float4x4 GetObjectToWorldMatrix()
 float4x4 GetWorldToObjectMatrix()
 {
     return UNITY_MATRIX_I_M;
-}
-
-float4x4 GetPrevObjectToWorldMatrix()
-{
-    return UNITY_PREV_MATRIX_M;
-}
-
-float4x4 GetPrevWorldToObjectMatrix()
-{
-    return UNITY_PREV_MATRIX_I_M;
 }
 
 float4x4 GetWorldToViewMatrix()

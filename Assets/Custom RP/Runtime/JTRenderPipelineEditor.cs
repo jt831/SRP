@@ -1,31 +1,61 @@
 using System.Collections;
 using System.Collections.Generic;
+using Unity.Collections;
 using UnityEngine;
-using UnityEngine.Rendering;
+using UnityEngine.Experimental.GlobalIllumination;
+using LightType = UnityEngine.LightType;
 
-public partial class JTRenderPipeline : RenderPipeline
+public partial class JTRenderPipeline
 {
-    private Batching _batching;
-    private ShadowProperties _shadowProperties;
-
-    public JTRenderPipeline(Batching batching, ShadowProperties shadowProperties)
+    partial void InitializeForEditor();
+    
+#if UNITY_EDITOR
+    partial void InitializeForEditor () 
     {
-        // Enable Srp Batching & GPU Instancing & Dynamic Batching 
-        GraphicsSettings.useScriptableRenderPipelineBatching = batching.SRPBatching;
-        this._batching.DynamicBatching = batching.DynamicBatching;
-        this._batching.GPUInstancing = batching.GPUInstancing;
-        this._shadowProperties = shadowProperties;
-        
-        GraphicsSettings.lightsUseLinearIntensity = true;
+	    Lightmapping.SetDelegate(lightsDelegate);
     }
-    // Render scene per camera
-    private CameraRenderer _cameraRender = new CameraRenderer();
-    protected override void Render(ScriptableRenderContext context, UnityEngine.Camera[] cameras)
+    protected override void Dispose (bool disposing) 
     {
-        foreach (var camera in cameras)
+	    base.Dispose(disposing);
+	    Lightmapping.ResetDelegate();
+    }
+    private static Lightmapping.RequestLightsDelegate lightsDelegate =
+        (Light[] lights, NativeArray<LightDataGI> output) =>
         {
-            _cameraRender.Render(context, camera, _batching, _shadowProperties);
-            EndCameraRendering(context, camera);
-        }
-    }
+            var lightData = new LightDataGI();
+            for (int i = 0; i < lights.Length; i++)
+            {
+                Light light = lights[i];
+                switch (light.type)
+                {
+                    case LightType.Directional:
+                        var directionalLight = new DirectionalLight();
+                        LightmapperUtils.Extract(light, ref directionalLight);
+                        lightData.Init(ref directionalLight);
+                        break;
+                    case LightType.Point:
+                        var pointLight = new PointLight();
+                        LightmapperUtils.Extract(light, ref pointLight);
+                        lightData.Init(ref pointLight);
+                        break;
+                    case LightType.Spot:
+                        var spotLight = new SpotLight();
+                        LightmapperUtils.Extract(light, ref spotLight);
+                        lightData.Init(ref spotLight);
+                        break;
+                    case LightType.Area:
+                        var rectangleLight = new RectangleLight();
+                        LightmapperUtils.Extract(light, ref rectangleLight);
+                        rectangleLight.mode = LightMode.Baked;
+                        lightData.Init(ref rectangleLight);
+                        break;
+                    default:lightData.InitNoBake(light.GetInstanceID());
+                        break;
+                    
+                }
+                lightData.falloff = FalloffType.InverseSquared;
+                output[i] = lightData;
+            }
+        };
+#endif
 }

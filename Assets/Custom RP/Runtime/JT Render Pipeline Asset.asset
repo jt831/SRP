@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5716774437711c46affcb24449f8793, type: 3}
+  m_Name: JT Render Pipeline Asset
+  m_EditorClassIdentifier: 
+  batching:
+    GPUInstancing: 0
+    SRPBatching: 0
+    DynamicBatching: 0
+  shadow:
+    distance: 200
+    resolution: 4096
+    Fliter: 4
+    fade: 0.273
+    shadowSlopBias: 1.39
+    sampleBlockerDepthRadius: 0.001
+    lightWidth: 0
+    cascade:
+      count: 4
+      ratio1: 0.3
+      ratio2: 0.5
+      ratio3: 0.7
