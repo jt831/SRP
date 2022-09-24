@@ -31,7 +31,7 @@ class Shadow
     private ScriptableRenderContext _context;
     private CullingResults _results;
     
-    private ShadowProperties _shadowProperties;
+    private DirectionalShadowProperties _shadowProperties;
     private Vector3 _cascadeRatios;
     private Light _light;
     private int _dirLightCount = 0;
@@ -67,7 +67,7 @@ class Shadow
 
     // 'SetupShadow' is in for loop
     public void SetupShadow(ScriptableRenderContext context, CullingResults results, 
-        ShadowProperties shadowProperties, Light light, int lightIndex)
+        DirectionalShadowProperties shadowProperties, Light light, int lightIndex)
     {
         this._context = context;
         this._results = results;
@@ -317,7 +317,7 @@ class Lighting
         ID_SpotLightDirection = Shader.PropertyToID("_SpotLightDirection"),
         ID_SpotLightAngle = Shader.PropertyToID("_SpotLightAngle");
         
-    public void RenderLights(ScriptableRenderContext context, CullingResults results, ShadowProperties shadowProperties)
+    public void RenderLights(ScriptableRenderContext context, CullingResults results, DirectionalShadowProperties shadowProperties)
     {
         /*
          * 1.Get and set visibleLights
@@ -418,7 +418,7 @@ public partial class CameraRenderer
     private ScriptableRenderContext _context;
     private UnityEngine.Camera _camera;
     private Batching _batching;
-    private ShadowProperties _shadowProperties;
+    private DirectionalShadowProperties _shadowProperties;
     private Lighting _lighting;
     private Shadow _shadow;
     private float _shadowDistance;
@@ -437,7 +437,7 @@ public partial class CameraRenderer
         "_DIRECTIONAL_PCF5",
         "_DIRECTIONAL_PCF7"
     };
-    public void Render(ScriptableRenderContext context, UnityEngine.Camera camera, Batching batching, ShadowProperties shadowProperties)
+    public void Render(ScriptableRenderContext context, UnityEngine.Camera camera, Batching batching, DirectionalShadowProperties shadowProperties)
     {
         /* 0. Render objects' shadows
          * 1. Setup properties

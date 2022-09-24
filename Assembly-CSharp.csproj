@@ -45,6 +45,7 @@
      <Compile Include="Assets\Custom RP\Runtime\JTRenderPipeline.cs" />
      <Compile Include="Assets\Custom RP\Scripts\CloudMaster.cs" />
      <Compile Include="Assets\Custom RP\Scripts\VarMaterial.cs" />
+     <Compile Include="Assets\Custom RP\Runtime\JTRenderPipelineEditor.cs" />
      <Compile Include="Assets\Custom RP\Scripts\JTRPShaderGUI.cs" />
      <Compile Include="Assets\Custom RP\Runtime\CameraRenderer.Editor.cs" />
      <Compile Include="Assets\Custom RP\Runtime\JTRenderPipelineAsset.cs" />
@@ -52,7 +53,6 @@
      <Compile Include="Assets\Custom RP\Runtime\CameraRenderer.cs" />
      <Compile Include="Assets\Custom RP\Scripts\ManyInstances.cs" />
      <Compile Include="Assets\Custom RP\Scripts\ShadowPropertiescs.cs" />
-     <Compile Include="Assets\Custom RP\Runtime\JTRenderPipelineEditor.cs" />
      <None Include="Assets\Custom RP\Shaders\UnlitPass.hlsl" />
      <None Include="Assets\Custom RP\Tools\GI.hlsl" />
      <None Include="Assets\Custom RP\Shaders\UnlitInstancePass.hlsl" />

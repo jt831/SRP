@@ -228,9 +228,13 @@ int GetCascadeIndex(int lightIndex, Material material)
     if (OutOfMaxShadowDistance(i, lightIndex, material)) return MAX_CASCADE_COUNT;
     return i;
 }
-float GetFadeWeight (Material material)
+float GetDirectionalFadeWeight (Material material)
 {
     return (1 + material.positionVS.z / _MaxShadowDistance) * (1 / _Fade);
+}
+float GetOthersFadeWeight (Material material, float shadowDistance)
+{
+    return (1 + material.positionVS.z / shadowDistance) * (1 / _Fade);
 }
 ShadowData GetDirectionalShadowData (int index, Material material, ShadowMask mask) {
     ShadowData data;
@@ -250,20 +254,20 @@ ShadowData GetDirectionalShadowData (int index, Material material, ShadowMask ma
         }
         return data;
     }
-    data.shadowStrength = abs(_DirectionalShadowData[index].x) * GetFadeWeight(material);
+    data.shadowStrength = abs(_DirectionalShadowData[index].x) * GetDirectionalFadeWeight(material);
     data.splitIndex = _DirectionalShadowData[index].y + cascadeIndex;
     // The closer camera2surface，the smaller bakedShadowStrength is, vice versa
-    data.bakedShadowStrength = 1 - saturate(GetFadeWeight(material));
+    data.bakedShadowStrength = 1 - saturate(GetDirectionalFadeWeight(material));
     data.shadowMaskChannel = _DirectionalShadowData[index].w;
     return data;
 }
-ShadowData GetPointShadowData (int index, Material material, ShadowMask mask) {
+ShadowData GetPointShadowData (int index, Material material, ShadowMask mask, float disSurface2Light) {
     ShadowData data;
     // If surfaceDistance is out of shadowDistance && shadowMask is disabled
-    data.shadowStrength = abs(_PointShadowData[index].x) * GetFadeWeight(material);
+    data.shadowStrength = abs(_PointShadowData[index].x) * GetOthersFadeWeight(material, disSurface2Light * 2);
     data.splitIndex = _PointShadowData[index].y;
     // The closer camera2surface，the smaller bakedShadowStrength is, vice versa
-    data.bakedShadowStrength = 1 - saturate(GetFadeWeight(material));
+    data.bakedShadowStrength = 1 - saturate(GetDirectionalFadeWeight(material));
     data.shadowMaskChannel = _PointShadowData[index].w;
     return data;
 }
@@ -271,10 +275,10 @@ ShadowData GetSpotShadowData (int index, Material material, ShadowMask mask)
 {
     ShadowData data;
     // If surfaceDistance is out of shadowDistance && shadowMask is disabled
-    data.shadowStrength = abs(_SpotShadowData[index].x) * GetFadeWeight(material);
+    data.shadowStrength = abs(_SpotShadowData[index].x) * GetDirectionalFadeWeight(material);
     data.splitIndex = _SpotShadowData[index].y;
     // The closer camera2surface，the smaller bakedShadowStrength is, vice versa
-    data.bakedShadowStrength = 1 - saturate(GetFadeWeight(material));
+    data.bakedShadowStrength = 1 - saturate(GetDirectionalFadeWeight(material));
     data.shadowMaskChannel = _SpotShadowData[index].w;
     return data;
 }
@@ -316,7 +320,7 @@ float GetBakedShadow(ShadowMask mask, int channel)
 }
 float GetDirectionalLightRealtimeShadow(ShadowData data, Material material)
 {
-    if (data.shadowStrength <= 0.0f)    return 1.0f;
+    if (data.shadowStrength <= 0.0f) return 1.0f;
     // Extend surface along normalDirection to avoid selfShadow
     float4 positionBiasWS = float4(material.positionWS + material.normalWS, 1.0f);
     // Transform positionWS to positionShadowSpace
@@ -348,9 +352,10 @@ float GetPointLightRealtimeShadow(int index, ShadowData data, Material material)
     float range = max(0.001, _PointLightPosition[index].w);
     return (1 - saturate(distance / range)) / distance;
 }
-float GetPointLightAttenuation(int index, Material material, ShadowMask shadowMask)
+float GetPointLightAttenuation(int index, Material material, ShadowMask shadowMask, float3 surfacePositionWS)
 {
-    ShadowData data = GetPointShadowData(index, material, shadowMask);
+    float disSurface2Light = max(0.0001, length(material.positionWS - surfacePositionWS));
+    ShadowData data = GetPointShadowData(index, material, shadowMask, disSurface2Light);
     float realtimeShadow = GetPointLightRealtimeShadow(index, data, material);
     float shadowStrength;
     if (shadowMask.enableShadowMask)
@@ -365,6 +370,7 @@ float GetPointLightAttenuation(int index, Material material, ShadowMask shadowMa
 }
 float GetSpotLightRealtimeShadow(int index, Material material, ShadowData data, float3 LightDirection)
 {
+    if (data.shadowStrength <= 0.0f) return 1.0f;
     float3 dirSurface2Light = normalize(_SpotLightPosition[index].xyz - material.positionWS);
     float disLight2Surface = max(0.001, length(_SpotLightPosition[index].xyz - material.positionWS));
     float range = max(0.001, _SpotLightPosition[index].w);
@@ -403,8 +409,8 @@ Light SetupPointLight(int index, Material material, ShadowMask shadowMask)
 {
     Light pointLight;
     pointLight.color = _PointLightColors[index].rgb;
-    pointLight.direction = SafeNormalize(_PointLightPosition[index].xyz - material.positionWS);
-    pointLight.attenuation = GetPointLightAttenuation(index, material, shadowMask);
+    pointLight.direction = normalize(_PointLightPosition[index].xyz - material.positionWS);
+    pointLight.attenuation = GetPointLightAttenuation(index, material, shadowMask, _PointLightPosition[index].xyz);
     
     return pointLight;
 }

@@ -6,9 +6,9 @@ using UnityEngine.Rendering;
 public partial class JTRenderPipeline : RenderPipeline
 {
     private Batching _batching;
-    private ShadowProperties _shadowProperties;
+    private DirectionalShadowProperties _shadowProperties;
 
-    public JTRenderPipeline(Batching batching, ShadowProperties shadowProperties)
+    public JTRenderPipeline(Batching batching, DirectionalShadowProperties shadowProperties)
     {
         // Enable Srp Batching & GPU Instancing & Dynamic Batching 
         GraphicsSettings.useScriptableRenderPipelineBatching = batching.SRPBatching;
