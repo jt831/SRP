@@ -29,6 +29,9 @@ TEXTURE2D(_DirectionalShadowAtlas);
 #define SHADOW_SAMPLER sampler_linear_clamp_compare
 SAMPLER(SHADOW_SAMPLER);
 
+TEXTURE2D(_OtherShadowAtlas);
+SAMPLER(sampler_OtherShadowAtlas);
+
 CBUFFER_START(_CustomLight)
 int _LightCount;
 float _MaxShadowDistance;
@@ -56,7 +59,8 @@ float4 _SpotLightPosition[MAX_SPOT_LIGHT_COUNT];
 float4 _SpotLightDirection[MAX_SPOT_LIGHT_COUNT];
 float4 _SpotLightAngle[MAX_SPOT_LIGHT_COUNT];
 float4 _SpotShadowData[MAX_SPOT_LIGHT_COUNT];
-
+//
+float4x4 _OtherTransformWorldToShadowMapMatrices[16];
 CBUFFER_END
 
 static float2 poissonDisk[NUM_SAMPLE] ={
@@ -198,7 +202,7 @@ float PCSS(float3 positionSS, float lightWidth)
 bool OutOfMaxShadowDistance(int cascadeIndex, int lightIndex, Material material)
 {
     float distancePosition2Camera = dot(material.positionWS - _WorldSpaceCameraPos.xyz, material.positionWS - _WorldSpaceCameraPos.xyz);
-    float maxCascadeSphereRadius = _DirectionalCascadeSphere[_DirectionalLightCount * lightIndex + MAX_CASCADE_COUNT - 1].w;
+    float maxCascadeSphereRadius = _DirectionalCascadeSphere[_DirectionalLightCascadeCount * lightIndex + MAX_CASCADE_COUNT - 1].w;
     if (cascadeIndex == MAX_CASCADE_COUNT - 1 && distancePosition2Camera > maxCascadeSphereRadius)
         return true;
     return false;
@@ -213,8 +217,8 @@ int GetCascadeIndex(int lightIndex, Material material)
     int i;
     for (i = 0; i < MAX_CASCADE_COUNT;i++)
     {
-        float3 cascadeSphereCenter = _DirectionalCascadeSphere[_DirectionalLightCount * lightIndex + i].xyz;
-        float cascadeSphereRadius = _DirectionalCascadeSphere[_DirectionalLightCount * lightIndex + i].w;
+        float3 cascadeSphereCenter = _DirectionalCascadeSphere[_DirectionalLightCascadeCount * lightIndex + i].xyz;
+        float cascadeSphereRadius = _DirectionalCascadeSphere[_DirectionalLightCascadeCount * lightIndex + i].w;
         float distanceSurface2SphereCenter = dot(material.positionWS - cascadeSphereCenter, material.positionWS - cascadeSphereCenter);
         // 因为当cameraPosition超过最大的cascadeSphereCenter之后，cascadeSphereCenter就不会继续变化了，即distanceSurface2SphereCenter不会继续变化。
         // 那么，如果此时的distanceSurface2SphereCenter < cascadeSphereRadius，则 forLoop会break，i，即cascadeIndex就不会等于MAX_CASCADE_COUNT。
@@ -236,29 +240,36 @@ float GetOthersFadeWeight (Material material, float shadowDistance)
 {
     return (1 + material.positionVS.z / shadowDistance) * (1 / _Fade);
 }
-ShadowData GetDirectionalShadowData (int index, Material material, ShadowMask mask) {
+ShadowData GetDirectionalShadowData (int index, Material material, ShadowMask mask)
+{
     ShadowData data;
     int cascadeIndex = GetCascadeIndex(index, material);
-    // If surfaceDistance is out of shadowDistance && shadowMask is disabled
-    if (cascadeIndex == MAX_CASCADE_COUNT)
+    if (mask.enableShadowMask)
     {
-        data.shadowStrength = 0;
-        data.splitIndex = 0;
-        data.bakedShadowStrength = 0;
-        if (mask.enableShadowMask)
-        {
-            data.shadowStrength = abs(_DirectionalShadowData[index].x);
-            data.splitIndex = _DirectionalShadowData[index].y + cascadeIndex;
-            data.shadowMaskChannel = _DirectionalShadowData[index].w;
-            data.bakedShadowStrength = 1;
-        }
-        return data;
+        // If enable shadowMask, draw shadow with no fade
+        data.shadowStrength = abs(_DirectionalShadowData[index].x);
+        data.splitIndex = _DirectionalShadowData[index].y + cascadeIndex;
+        data.bakedShadowStrength = 1 - saturate(GetDirectionalFadeWeight(material));
+        data.shadowMaskChannel = _DirectionalShadowData[index].w;
     }
-    data.shadowStrength = abs(_DirectionalShadowData[index].x) * GetDirectionalFadeWeight(material);
-    data.splitIndex = _DirectionalShadowData[index].y + cascadeIndex;
-    // The closer camera2surface，the smaller bakedShadowStrength is, vice versa
-    data.bakedShadowStrength = 1 - saturate(GetDirectionalFadeWeight(material));
-    data.shadowMaskChannel = _DirectionalShadowData[index].w;
+    else
+    {
+        // If disable shadowMask && Camera2SurfaceDistance is out of maxShadowDistance, don't draw shadow at all
+        if (cascadeIndex == MAX_CASCADE_COUNT)
+        {
+            data.shadowStrength = 0;
+            data.splitIndex = 0;
+            data.shadowMaskChannel = 0;
+            data.bakedShadowStrength = 0;
+        }
+        else
+        {
+            data.shadowStrength = abs(_DirectionalShadowData[index].x) * GetDirectionalFadeWeight(material);
+            data.splitIndex = _DirectionalShadowData[index].y + cascadeIndex;
+            data.bakedShadowStrength = 1 - saturate(GetDirectionalFadeWeight(material));
+            data.shadowMaskChannel = _DirectionalShadowData[index].w;
+        }
+    }
     return data;
 }
 ShadowData GetPointShadowData (int index, Material material, ShadowMask mask, float disSurface2Light) {
@@ -284,7 +295,7 @@ ShadowData GetSpotShadowData (int index, Material material, ShadowMask mask)
 }
 float SampleShadowMap(float3 positionSS)
 {
-    float shadowStrength = 0.0f;
+    float shadowStrength;
     // Choose sample type by PCF
     #if defined(DIRECTIONAL_FILTER_SETUP)
         float weights[DIRECTIONAL_FILTER_SAMPLES];
@@ -332,18 +343,16 @@ float GetDirectionalLightRealtimeShadow(ShadowData data, Material material)
 }
 float GetDirectionalLightAttenuation(int index, Material material, ShadowMask shadowMask)
 {
-    // Decide whether use realtimeLightAttenuation or bakedLightAttenuation
     ShadowData data = GetDirectionalShadowData(index, material, shadowMask);
     float realtimeShadow = GetDirectionalLightRealtimeShadow(data, material);
     float shadowStrength;
     if (shadowMask.enableShadowMask)
     {
         float bakedShadow = GetBakedShadow(shadowMask, data.shadowMaskChannel);
-        shadowStrength = lerp(realtimeShadow, bakedShadow, data.bakedShadowStrength);
+        shadowStrength = min(bakedShadow, lerp(realtimeShadow, bakedShadow, data.bakedShadowStrength));
     }
     else
         shadowStrength = realtimeShadow;
-    
     return lerp(1.0, shadowStrength, data.shadowStrength);
 }
 float GetPointLightRealtimeShadow(int index, ShadowData data, Material material)
@@ -401,8 +410,8 @@ Light SetupDirectionalLight(int index, Material material, ShadowMask shadowMask)
     dirLight.color = _DirectionalLightColors[index].rgb;
     dirLight.direction = _DirectionalLightDirection[index].xyz;
     dirLight.attenuation = GetDirectionalLightAttenuation(index, material, shadowMask);
-    /*int cascadeIndex = GetCascadeIndex(lightIndex, material);
-    light.attenuation = cascadeIndex * 0.25;*/
+    /*int cascadeIndex = GetCascadeIndex(index, material);
+    dirLight.attenuation = cascadeIndex * 0.25;*/
     return dirLight;
 }
 Light SetupPointLight(int index, Material material, ShadowMask shadowMask)

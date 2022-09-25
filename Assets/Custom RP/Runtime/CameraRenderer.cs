@@ -31,50 +31,49 @@ class Shadow
     private ScriptableRenderContext _context;
     private CullingResults _results;
     
-    private DirectionalShadowProperties _shadowProperties;
+    private DirectionalShadowProperties _dirShadowProperties;
+    private OtherShadowProperties _otherShadowProperties;
     private Vector3 _cascadeRatios;
     private Light _light;
+    private int _shadowLightCount = 0;
     private int _dirLightCount = 0;
     private int _spotLightCount = 0;
     private int _pointLightCount = 0;
     private int _dirShadowLightCount = 0;
-    private int _spotShadowLightCount = 0;
-    private int _pointShadowLightCount = 0;
-    // Light which can cast shadow
-    struct ShadowedLight
-    {
-        public int shadowedLightIndex;
-    }
-    private ShadowedLight[] _shadowedLights = new ShadowedLight[ConstNumber.MAXShadowedLights];
-    private int _shadowLightCount = 0;
-    
+    private int _otherShadowLightCount = 0;
     private int _lightIndex;
-    private int _splitNum;
+    private int _splitNum;  // split shadowMap into splitNum * splitNum
     private int _splitSize;
     private int _dirLightSplitCount;
     private bool _enableShadowMask = false;
 
-    public Matrix4x4[] _TransformWorldToShadowMapMatrices = new Matrix4x4[ConstNumber.MAXShadowedLights * ConstNumber.MAXCascades];
-    public Vector4[] _DirectionalShadowData = new Vector4[ConstNumber.MAXShadowedLights];
-    public Vector4[] _DirectionalCascadeSphere = new Vector4[ConstNumber.MAXShadowedLights * ConstNumber.MAXCascades];
+    public Matrix4x4[] _TransformWorldToShadowMapMatrices = new Matrix4x4[ConstNumber.MAXDirectionalLights * ConstNumber.MAXCascades];
+    public Vector4[] _DirectionalShadowData = new Vector4[ConstNumber.MAXDirectionalLights];
+    public Vector4[] _DirectionalCascadeSphere = new Vector4[ConstNumber.MAXDirectionalLights * ConstNumber.MAXCascades];
     public Vector4[] _SpotShadowData = new Vector4[ConstNumber.MAXSpotLights];
     public Vector4[] _PointShadowData = new Vector4[ConstNumber.MAXPointLights];
+    public Matrix4x4[] _OtherTransformWorldToShadowMapMatrices = new Matrix4x4[16];
+
     private static int
         ID_DirectionalShadowAtlas = Shader.PropertyToID("_DirectionalShadowAtlas"),
-        ID_DirectionalLightCascadeCount= Shader.PropertyToID("_DirectionalLightCascadeCount"),
-        ID_DirectionalCascadeSphere= Shader.PropertyToID("_DirectionalCascadeSphere"),
-        ID_TransformWorldToShadowMapMatrices = Shader.PropertyToID("_TransformWorldToShadowMapMatrices");
+        ID_DirectionalLightCascadeCount = Shader.PropertyToID("_DirectionalLightCascadeCount"),
+        ID_DirectionalCascadeSphere = Shader.PropertyToID("_DirectionalCascadeSphere"),
+        ID_TransformWorldToShadowMapMatrices = Shader.PropertyToID("_TransformWorldToShadowMapMatrices"),
+        ID_OtherShadowAtlas = Shader.PropertyToID("_OtherShadowAtlas"),
+        ID_OtherTransformWorldToShadowMapMatrices = Shader.PropertyToID("_OtherTransformWorldToShadowMapMatrices");
 
     // 'SetupShadow' is in for loop
     public void SetupShadow(ScriptableRenderContext context, CullingResults results, 
-        DirectionalShadowProperties shadowProperties, Light light, int lightIndex)
+        DirectionalShadowProperties dirShadowProperties, OtherShadowProperties otherShadowProperties, 
+        Light light, int lightIndex)
     {
         this._context = context;
         this._results = results;
-        this._shadowProperties = shadowProperties;
+        this._dirShadowProperties = dirShadowProperties;
+        this._otherShadowProperties = otherShadowProperties;
         this._light = light;
         this._lightIndex = lightIndex;      // Index in visibleLights
-        this._dirLightSplitCount = _dirLightCount * _shadowProperties.cascade.count;
+        this._dirLightSplitCount = _dirLightCount * _dirShadowProperties.cascade.count;
         
         // Check if shadowMask is enabled
         if (_light.bakingOutput.lightmapBakeType == LightmapBakeType.Mixed
@@ -83,26 +82,22 @@ class Shadow
         // Setup shadowData per Light
         if (IsShadowedLight())
         {
-            _shadowedLights[_shadowLightCount] = new ShadowedLight
-            {
-                shadowedLightIndex = _lightIndex,
-            };
             switch (_light.type)
             {
                 case LightType.Directional:
-                    _DirectionalShadowData[_dirLightCount++] = new Vector4(_light.shadowStrength, _shadowLightCount, 
-                        0, _light.bakingOutput.occlusionMaskChannel);
+                    _DirectionalShadowData[_dirLightCount++] = new Vector4(_light.shadowStrength, _lightIndex, 
+                        _dirShadowLightCount, _light.bakingOutput.occlusionMaskChannel);
                     _dirShadowLightCount++;
                     break;
                 case LightType.Spot:
-                    _SpotShadowData[_spotLightCount++] = new Vector4(_light.shadowStrength, _shadowLightCount,
-                        0, _light.bakingOutput.occlusionMaskChannel);
-                    _spotShadowLightCount++;
+                    _SpotShadowData[_spotLightCount++] = new Vector4(_light.shadowStrength, _lightIndex,
+                        _otherShadowLightCount, _light.bakingOutput.occlusionMaskChannel);
+                    _otherShadowLightCount++;
                     break;
                 case LightType.Point:
-                    _PointShadowData[_pointLightCount++] = new Vector4(_light.shadowStrength, _shadowLightCount,
-                        0, _light.bakingOutput.occlusionMaskChannel);
-                    _pointShadowLightCount++;
+                    _PointShadowData[_pointLightCount++] = new Vector4(_light.shadowStrength, _lightIndex,
+                        _otherShadowLightCount, _light.bakingOutput.occlusionMaskChannel);
+                    _otherShadowLightCount++;
                     break;
             }
             _shadowLightCount++;
@@ -112,13 +107,13 @@ class Shadow
             switch (_light.type)
             {
                 case LightType.Directional:
-                    _DirectionalShadowData[_dirLightCount++] = new Vector4(0, 0, 0, 0);
+                    _DirectionalShadowData[_dirLightCount++] = new Vector4(_light.shadowStrength, -1, -1, 0);
                     break;
                 case LightType.Spot:
-                    _SpotShadowData[_spotLightCount++] = new Vector4(0, 0, 0, 0);
+                    _SpotShadowData[_spotLightCount++] = new Vector4(_light.shadowStrength, -1, -1, 0);
                     break;
                 case LightType.Point:
-                    _PointShadowData[_pointLightCount++] = new Vector4(0, 0, 0, 0);
+                    _PointShadowData[_pointLightCount++] = new Vector4(_light.shadowStrength, -1, -1, 0);
                     break;
             }
         }
@@ -138,16 +133,21 @@ class Shadow
                && _light.shadowStrength > 0f
                && _results.GetShadowCasterBounds(_lightIndex, out Bounds bounds);
     }
+    public void DrawShadow()
+    {
+        DrawDirectionalShadow();
+        DrawOtherShadow();
+    }
     public void DrawDirectionalShadow()
     {
         if (_dirShadowLightCount > 0)
         {
-            this._splitNum = _dirShadowLightCount * _shadowProperties.cascade.count <= 1 ? 1 :
-                _dirShadowLightCount * _shadowProperties.cascade.count <= 4 ? 2 : 4;
+            this._splitNum = _dirShadowLightCount * _dirShadowProperties.cascade.count <= 1 ? 1 :
+                _dirShadowLightCount * _dirShadowProperties.cascade.count <= 4 ? 2 : 4;
             this._cascadeRatios = 
-                new Vector3(_shadowProperties.cascade.ratio1, _shadowProperties.cascade.ratio2, _shadowProperties.cascade.ratio3);
-            this._splitSize = (int) _shadowProperties.resolution / _splitNum;
-            int shadowMapResolution = (int)_shadowProperties.resolution;
+                new Vector3(_dirShadowProperties.cascade.ratio1, _dirShadowProperties.cascade.ratio2, _dirShadowProperties.cascade.ratio3);
+            this._splitSize = (int) _dirShadowProperties.resolution / _splitNum;
+            int shadowMapResolution = (int)_dirShadowProperties.resolution;
             // Create a RenderTexture as a ShadowMap
             _shadowBuffer.GetTemporaryRT(ID_DirectionalShadowAtlas, shadowMapResolution, shadowMapResolution,
                 32, FilterMode.Bilinear, RenderTextureFormat.Shadowmap);
@@ -161,10 +161,13 @@ class Shadow
             // Draw shadows foreach DirectionalShadowedLight
             for (int i = 0; i < _dirLightCount; i++)
             {
-                int shadowLightIndex = (int)_DirectionalShadowData[i].y;
-                DrawDirectionalShadow(shadowLightIndex);
+                int lightIndex = (int)_DirectionalShadowData[i].y;
+                // the ith Directional Shadowed Light
+                int dirShadowLightIndex = (int) _DirectionalShadowData[i].z;
+                if (lightIndex < 0) continue;
+                DrawDirectionalShadow(lightIndex, dirShadowLightIndex);
             }
-            SetGlobalValue(ID_DirectionalLightCascadeCount, _shadowProperties.cascade.count);
+            SetGlobalValue(ID_DirectionalLightCascadeCount, _dirShadowProperties.cascade.count);
             SetGlobalValue(ID_TransformWorldToShadowMapMatrices, _TransformWorldToShadowMapMatrices);
             SetGlobalValue(ID_DirectionalCascadeSphere, _DirectionalCascadeSphere);
             _shadowBuffer.EndSample(shadowBufferName);
@@ -178,23 +181,22 @@ class Shadow
              * But if we don't claim it, it's Sampler can't find his Texture, and program would be failed
              * So what we do here is claim a tiny Texture just to satisfy Sampler
              */
-            _shadowBuffer.GetTemporaryRT(Shader.PropertyToID("_DirectionalShadowAtlas"), 1, 1,
+            _shadowBuffer.GetTemporaryRT(ID_DirectionalShadowAtlas, 1, 1,
                 32, FilterMode.Bilinear, RenderTextureFormat.Shadowmap);
         }
     }
-    private void DrawDirectionalShadow(int i)
+    private void DrawDirectionalShadow(int lightIndex, int dirShadowLightIndex)
     {
-        ShadowedLight shadowedLight = _shadowedLights[i];
         // Initialize ShadowDrawingSettings
-        ShadowDrawingSettings shadowDrawingSettings = new ShadowDrawingSettings(_results, shadowedLight.shadowedLightIndex);
+        ShadowDrawingSettings shadowDrawingSettings = new ShadowDrawingSettings(_results, lightIndex);
         // Draw ShadowMap for each cascade per shadowedLight
-        int splitOffset = i * _shadowProperties.cascade.count;
-        for (int j = 0; j < _shadowProperties.cascade.count; j++)
+        int splitOffset = dirShadowLightIndex * _dirShadowProperties.cascade.count;
+        for (int j = 0; j < _dirShadowProperties.cascade.count; j++)
         {
             int splitIndex = splitOffset + j;
             _results.ComputeDirectionalShadowMatricesAndCullingPrimitives(
-                shadowedLight.shadowedLightIndex, j, _shadowProperties.cascade.count,
-                _cascadeRatios, (int)_shadowProperties.resolution, _light.shadowNearPlane,
+                lightIndex, j, _dirShadowProperties.cascade.count,
+                _cascadeRatios, (int)_dirShadowProperties.resolution, _light.shadowNearPlane,
                 out Matrix4x4 viewMatrix, out Matrix4x4 projMatrix, out ShadowSplitData shadowSplitData);
             // Try to cull some surface from large cascade if it can be render in smaller cascade
             shadowSplitData.shadowCascadeBlendCullingFactor = 1f;
@@ -208,10 +210,64 @@ class Shadow
             _shadowBuffer.SetViewProjectionMatrices(viewMatrix, projMatrix);
             // 'DrawShadows' only render objs with Pass with "ShadowCaster" Tags
             ExecuteBuffer();
-            _shadowBuffer.SetGlobalDepthBias(0, _shadowProperties.shadowSlopBias);
+            _shadowBuffer.SetGlobalDepthBias(0, _dirShadowProperties.shadowSlopBias);
             _context.DrawShadows(ref shadowDrawingSettings);
             _shadowBuffer.SetGlobalDepthBias(0, 0);
         }
+    }
+    public void DrawOtherShadow()
+    {
+        int otherLightCount = _spotLightCount + _pointLightCount;
+        if (_otherShadowLightCount > 0)
+        {
+            this._splitNum = _otherShadowLightCount <= 1 ? 1 : 2;
+            this._splitSize = (int) _otherShadowProperties.resolution / _splitNum;
+            int shadowMapResolution = (int)_otherShadowProperties.resolution;
+            // Create a RenderTexture as a ShadowMap
+            _shadowBuffer.GetTemporaryRT(ID_OtherShadowAtlas, shadowMapResolution, shadowMapResolution,
+                32, FilterMode.Bilinear, RenderTextureFormat.Shadowmap);
+            // Set RenderTarget
+            _shadowBuffer.SetRenderTarget(ID_OtherShadowAtlas, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store);
+            // Clear RenderTarget
+            _shadowBuffer.ClearRenderTarget(true, false, Color.clear);
+
+            _shadowBuffer.BeginSample(shadowBufferName);
+            ExecuteBuffer();
+            // Draw shadows foreach DirectionalShadowedLight
+            for (int i = 0; i < _spotLightCount; i++)
+            {
+                int lightIndex = (int)_SpotShadowData[i].y;
+                int otherShadowLightIndex = (int)_SpotShadowData[i].z;
+                if (lightIndex < 0) break;
+                DrawOtherShadow(lightIndex, otherShadowLightIndex);
+            }
+            for (int i = 0; i < _pointLightCount; i++)
+            {
+                int lightIndex = (int)_PointShadowData[i].y;
+                int otherShadowLightIndex = (int)_PointShadowData[i].z;
+                if (lightIndex < 0) break;
+                DrawOtherShadow(lightIndex, otherShadowLightIndex);
+            }
+            SetGlobalValue(ID_OtherTransformWorldToShadowMapMatrices, _OtherTransformWorldToShadowMapMatrices);
+            _shadowBuffer.EndSample(shadowBufferName);
+            ExecuteBuffer();
+        }
+        else
+        {
+            _shadowBuffer.GetTemporaryRT(ID_OtherShadowAtlas, 1, 1,
+                32, FilterMode.Bilinear, RenderTextureFormat.Shadowmap);
+        }
+    }
+    private void DrawOtherShadow(int lightIndex, int otherShadowLightIndex)
+    {
+        var shadowSettings = new ShadowDrawingSettings(_results, lightIndex);
+        _results.ComputeSpotShadowMatricesAndCullingPrimitives(lightIndex, out Matrix4x4 viewMatrix,
+            out Matrix4x4 projectionMatrix, out ShadowSplitData splitData
+        );
+        _shadowBuffer.SetViewProjectionMatrices(viewMatrix, projectionMatrix);
+        shadowSettings.splitData = splitData;
+        ExecuteBuffer();
+        _context.DrawShadows(ref shadowSettings);
     }
     private Vector2 SetupSplit(int i)
     {
@@ -317,7 +373,8 @@ class Lighting
         ID_SpotLightDirection = Shader.PropertyToID("_SpotLightDirection"),
         ID_SpotLightAngle = Shader.PropertyToID("_SpotLightAngle");
         
-    public void RenderLights(ScriptableRenderContext context, CullingResults results, DirectionalShadowProperties shadowProperties)
+    public void RenderLights(ScriptableRenderContext context, CullingResults results, 
+        DirectionalShadowProperties dirShadowProperties, OtherShadowProperties otherShadowProperties)
     {
         /*
          * 1.Get and set visibleLights
@@ -344,9 +401,9 @@ class Lighting
         Debug.Log("VisibleLights' count = " + bound);
         for (int i = 0; i < bound; i++)
         {
-            _shadow.SetupShadow(_context, _results, shadowProperties, visibleLights[i].light, i);
+            _shadow.SetupShadow(_context, _results, dirShadowProperties, otherShadowProperties, visibleLights[i].light, i);
         }
-        _shadow.DrawDirectionalShadow();
+        _shadow.DrawShadow();
         // 3. Ending
         SetGlobalValue(ref visibleLights);
         _lightBuffer.EndSample(lightBufferName);
@@ -418,7 +475,8 @@ public partial class CameraRenderer
     private ScriptableRenderContext _context;
     private UnityEngine.Camera _camera;
     private Batching _batching;
-    private DirectionalShadowProperties _shadowProperties;
+    private DirectionalShadowProperties _dirShadowProperties;
+    private OtherShadowProperties _otherShadowProperties;
     private Lighting _lighting;
     private Shadow _shadow;
     private float _shadowDistance;
@@ -437,7 +495,8 @@ public partial class CameraRenderer
         "_DIRECTIONAL_PCF5",
         "_DIRECTIONAL_PCF7"
     };
-    public void Render(ScriptableRenderContext context, UnityEngine.Camera camera, Batching batching, DirectionalShadowProperties shadowProperties)
+    public void Render(ScriptableRenderContext context, UnityEngine.Camera camera, Batching batching, 
+        DirectionalShadowProperties dirShadowProperties, OtherShadowProperties otherShadowProperties)
     {
         /* 0. Render objects' shadows
          * 1. Setup properties
@@ -448,7 +507,8 @@ public partial class CameraRenderer
         this._camera = camera;
         this._batching.DynamicBatching = batching.DynamicBatching;
         this._batching.GPUInstancing = batching.GPUInstancing;
-        this._shadowProperties = shadowProperties;
+        this._dirShadowProperties = dirShadowProperties;
+        this._otherShadowProperties = otherShadowProperties;
         this._lighting = new Lighting();
         this._shadow = new Shadow();
         PrepareBuffer();
@@ -471,7 +531,7 @@ public partial class CameraRenderer
         if (_camera.TryGetCullingParameters(out ScriptableCullingParameters parameters))
         {
             // Set ShadowDistance
-            this._shadowDistance = Math.Min(_shadowProperties.distance, _camera.farClipPlane);
+            this._shadowDistance = Math.Min(_dirShadowProperties.distance, _camera.farClipPlane);
             parameters.shadowDistance = _shadowDistance;
             this._results = _context.Cull(ref parameters);
             return true;
@@ -482,7 +542,7 @@ public partial class CameraRenderer
     {
         _buffer.BeginSample(BufferName);
         ExecuteBuffer();
-        _lighting.RenderLights(_context, _results, _shadowProperties);
+        _lighting.RenderLights(_context, _results, _dirShadowProperties, _otherShadowProperties);
         _buffer.EndSample(BufferName);
     }
     private void Setup()
@@ -554,17 +614,17 @@ public partial class CameraRenderer
     {
         Vector3 cameraDirection = camera.transform.forward;
         _buffer.SetGlobalVector(ID_ViewDirection, -cameraDirection);
-        _buffer.SetGlobalFloat(ID_MaxShadowDistance, _shadowProperties.distance);
-        _buffer.SetGlobalFloat(ID_Fade, _shadowProperties.fade);
-        _buffer.SetGlobalFloat(ID_SampleBlockerDepthRadius, _shadowProperties.sampleBlockerDepthRadius);
-        _buffer.SetGlobalFloat(ID_LightWidth, _shadowProperties.lightWidth);
+        _buffer.SetGlobalFloat(ID_MaxShadowDistance, _dirShadowProperties.distance);
+        _buffer.SetGlobalFloat(ID_Fade, _dirShadowProperties.fade);
+        _buffer.SetGlobalFloat(ID_SampleBlockerDepthRadius, _dirShadowProperties.sampleBlockerDepthRadius);
+        _buffer.SetGlobalFloat(ID_LightWidth, _dirShadowProperties.lightWidth);
         _buffer.SetGlobalVector(ID_ShadowMapResolution, 
-            new Vector4((float)_shadowProperties.resolution, 1.0f / (float)_shadowProperties.resolution));
+            new Vector4((float)_dirShadowProperties.resolution, 1.0f / (float)_dirShadowProperties.resolution));
         ExecuteBuffer();
     }
     private void SetKeywords()
     {
-        int filterMode = (int)_shadowProperties.Fliter - 1;
+        int filterMode = (int)_dirShadowProperties.Fliter - 1;
         for (int i = 0; i < filterKeywords.Length; i++)
         {
             if (i == filterMode) _buffer.EnableShaderKeyword(filterKeywords[i]);

@@ -14,18 +14,24 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   batching:
     GPUInstancing: 0
-    SRPBatching: 0
-    DynamicBatching: 0
+    SRPBatching: 1
+    DynamicBatching: 1
   shadow:
-    distance: 200
-    resolution: 4096
-    Fliter: 4
-    fade: 0.273
-    shadowSlopBias: 1.39
-    sampleBlockerDepthRadius: 0.001
-    lightWidth: 0
-    cascade:
-      count: 4
-      ratio1: 0.3
-      ratio2: 0.5
-      ratio3: 0.7
+    directional:
+      distance: 200
+      resolution: 2048
+      Fliter: 0
+      fade: 0.5
+      shadowSlopBias: 0.5
+      sampleBlockerDepthRadius: 0.001
+      lightWidth: 0.001
+      cascade:
+        count: 4
+        ratio1: 0.1
+        ratio2: 0.3
+        ratio3: 0.7
+    other:
+      distance: 20
+      resolution: 1024
+      Fliter: 0
+      fade: 0.5
