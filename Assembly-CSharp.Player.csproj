@@ -70,6 +70,7 @@
      <None Include="Assets\Custom RP\Shaders\Cloud.shader" />
      <None Include="Assets\Custom RP\Tools\JTRPCommonFunc.hlsl" />
      <None Include="Assets\Custom RP\Tools\TransformTools.hlsl" />
+     <None Include="Assets\Custom RP\Tools\Shadow.hlsl" />
      <None Include="Assets\Custom RP\Tools\Material.hlsl" />
      <Reference Include="UnityEngine">
      <HintPath>D:\Unity\2022.1.7f1c1\Editor\Data\PlaybackEngines\WindowsStandaloneSupport\Variations\mono\Managed\UnityEngine.dll</HintPath>
