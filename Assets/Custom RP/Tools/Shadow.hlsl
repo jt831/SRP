@@ -1,3 +1,11 @@
+#define MAX_LIGHT_COUNT 20
+#define MAX_DIRECTIONAL_LIGHT_COUNT 4
+#define MAX_POINT_LIGHT_COUNT 8
+#define MAX_SPOT_LIGHT_COUNT 6
+#define MAX_SHADOWED_DIRECTIONAL_LIGHT_COUNT 4
+#define MAX_CASCADE_COUNT 4
+#define NUM_SAMPLE 64
+
 static float2 poissonDisk[NUM_SAMPLE] =
 {
     float2(-0.5119625f, -0.4827938f),
@@ -73,6 +81,7 @@ static const float3 pointShadowPlanes[6] = {
     float3(0.0, 0.0, -1.0),
     float3(0.0, 0.0, 1.0)
 };
+
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Shadow/ShadowSamplingTent.hlsl"
 #if defined (_DIRECTIONAL_PCSS)
 #elif defined(_DIRECTIONAL_PCF3)
@@ -86,12 +95,12 @@ static const float3 pointShadowPlanes[6] = {
 #define DIRECTIONAL_FILTER_SETUP SampleShadow_ComputeSamples_Tent_7x7
 #endif
 
-TEXTURE2D_SHADOW(_DirectionalShadowAtlas);
+TEXTURE2D(_DirectionalShadowMap);
 #define SHADOW_SAMPLER sampler_linear_clamp_compare
-SAMPLER_CMP(SHADOW_SAMPLER);
+SAMPLER(SHADOW_SAMPLER);
 
-TEXTURE2D_SHADOW(_OtherShadowAtlas);
-SAMPLER_CMP(sampler_OtherShadowAtlas);
+TEXTURE2D(_OtherShadowMap);
+SAMPLER_CMP(sampler_OtherShadowMap);
 
 struct ShadowData
 {
@@ -120,14 +129,14 @@ float4 _DirectionalLightColors[MAX_DIRECTIONAL_LIGHT_COUNT];
 float4 _DirectionalLightDirection[MAX_DIRECTIONAL_LIGHT_COUNT];
 float4 _DirectionalShadowData[MAX_DIRECTIONAL_LIGHT_COUNT];
 float4 _DirectionalCascadeSphere[MAX_SHADOWED_DIRECTIONAL_LIGHT_COUNT * MAX_CASCADE_COUNT];
-float4x4 _TransformWorldToShadowMapMatrices[MAX_SHADOWED_DIRECTIONAL_LIGHT_COUNT * MAX_CASCADE_COUNT];
+float4x4 _TransformWorldToShadowMapMatrices[MAX_DIRECTIONAL_LIGHT_COUNT * MAX_CASCADE_COUNT];
 // Point Light
 int _PointLightCount;
 float4 _PointLightColors[MAX_POINT_LIGHT_COUNT];
 float4 _PointLightPosition[MAX_POINT_LIGHT_COUNT];
 float4 _PointShadowData[MAX_POINT_LIGHT_COUNT];
 float4 _PointShadowData2[MAX_POINT_LIGHT_COUNT];
-float4x4 _PointTransformWorldToShadowMapMatrices[16];
+float4x4 _PointTransformWorldToShadowMapMatrices[MAX_POINT_LIGHT_COUNT * 6];
 // Spot Light
 int _SpotLightCount;
 float4 _SpotLightColors[MAX_SPOT_LIGHT_COUNT];
@@ -135,7 +144,7 @@ float4 _SpotLightPosition[MAX_SPOT_LIGHT_COUNT];
 float4 _SpotLightDirection[MAX_SPOT_LIGHT_COUNT];
 float4 _SpotLightAngle[MAX_SPOT_LIGHT_COUNT];
 float4 _SpotShadowData[MAX_SPOT_LIGHT_COUNT];
-float4x4 _SpotTransformWorldToShadowMapMatrices[16];
+float4x4 _SpotTransformWorldToShadowMapMatrices[MAX_SPOT_LIGHT_COUNT];
 CBUFFER_END
 
 float GetBlockerDepth(float3 positionSS, float lightWidth)
@@ -145,7 +154,7 @@ float GetBlockerDepth(float3 positionSS, float lightWidth)
     for (int i = 0;i < NUM_SAMPLE;i++)
     {
         float3 positionBiasWS = float3(positionSS.xy + poissonDisk[i] * radius, positionSS.z);
-        float depth = SAMPLE_TEXTURE2D_SHADOW(_DirectionalShadowAtlas, SHADOW_SAMPLER, positionBiasWS);
+        float depth = SAMPLE_TEXTURE2D(_DirectionalShadowMap, SHADOW_SAMPLER, positionBiasWS.xy);
         #if UNITY_REVERSED_Z
         blockerDepth += (1 - depth);
         #else
@@ -161,7 +170,12 @@ float PCF(float3 positionSS, float radius)
     {
         float2 offset = poissonDisk[i] * radius;
         positionSS.xy += offset;
-        shadowStrength = SAMPLE_TEXTURE2D_SHADOW(_DirectionalShadowAtlas, SHADOW_SAMPLER, positionSS);
+        shadowStrength = SAMPLE_TEXTURE2D(_DirectionalShadowMap, SHADOW_SAMPLER, positionSS.xy);
+        #if UNITY_REVERSED_Z
+        shadowStrength = step(shadowStrength, positionSS.z);
+        #else
+        shadowStrength = step(positionSS.z, shadowStrength);
+        #endif
         res += shadowStrength;
     }
     return res / NUM_SAMPLE;
@@ -191,4 +205,195 @@ float3 GetSpotLightSampleOffset(int index, Material material)
     float weight = 1 - saturate(dot(material.normalWS, lightDirection));
     float3 offset = material.normalWS * weight;
     return offset;
+}
+float3 GetDirectionalLightSampleOffset(int index, Material material)
+{
+    //float3 lightDirection = normalize(float3(_DirectionalLightDirection[index].x + 1, _SpotLightDirection[index].yz));
+    float3 lightDirection = normalize(_DirectionalLightDirection[index]);
+    float weight = 1 - saturate(dot(material.normalWS, lightDirection));
+    float3 offset = material.normalWS * weight * 0.3;
+    return offset;
+}
+float GetFadeWeight (Material material)
+{
+    return saturate((1 + material.positionVS.z / _MaxShadowDistance) * (1 / _Fade));
+}
+bool OutOfMaxShadowDistance(int cascadeIndex, int lightIndex, Material material)
+{
+    float distancePosition2Camera = dot(material.positionWS - _WorldSpaceCameraPos.xyz, material.positionWS - _WorldSpaceCameraPos.xyz);
+    float maxCascadeSphereRadius = _DirectionalCascadeSphere[_DirectionalLightCascadeCount * lightIndex + MAX_CASCADE_COUNT - 1].w;
+    if (cascadeIndex == MAX_CASCADE_COUNT - 1 && distancePosition2Camera > maxCascadeSphereRadius) return true;
+    return false;
+}
+int GetCascadeIndex(int lightIndex, Material material)
+{
+    // 实现“根据cameraPosition与surfacePosition的距离选择合适的cascadeSphereIndex“
+    // 但直接使用cameraPosition会出现一些奇怪的问题，所以我使用cascadeSphereCenter代替cameraPosition
+    // 这就是forLoop在做的事情
+    // 我还想通过cascadeIndex == MAX_CASCADE_COUNT表示cameraPosition超出了maxShadowDistance
+    // 但是forLoop无法完成这个目标
+    int i;
+    for (i = 0; i < MAX_CASCADE_COUNT;i++)
+    {
+        float3 cascadeSphereCenter = _DirectionalCascadeSphere[_DirectionalLightCascadeCount * lightIndex + i].xyz;
+        float cascadeSphereRadius = _DirectionalCascadeSphere[_DirectionalLightCascadeCount * lightIndex + i].w;
+        float distanceSurface2SphereCenter = dot(material.positionWS - cascadeSphereCenter, material.positionWS - cascadeSphereCenter);
+        // 因为当cameraPosition超过最大的cascadeSphereCenter之后，cascadeSphereCenter就不会继续变化了，即distanceSurface2SphereCenter不会继续变化。
+        // 那么，如果此时的distanceSurface2SphereCenter < cascadeSphereRadius，则 forLoop会break，i，即cascadeIndex就不会等于MAX_CASCADE_COUNT。
+        // 从而无法通过cascadeIndex == MAX_CASCADE_COUNT来判断camera是否超出maxShadowDistance
+        if (distanceSurface2SphereCenter < cascadeSphereRadius) break;
+    }
+    // 但是我想保留这种判断方法，所以得想办法实现“当camera超出maxShadowDistance时，cascadeIndex == MAX_CASCADE_COUNT”
+    // 所以在这里做一个特殊的判断，只在cascadeIndex == MAX_CASCADE_COUNT - 1时使用cameraPosition而不是cascadeSphereCenter
+    // 如果cascadeIndex == MAX_CASCADE_COUNT - 1 && distancePosition2Camera > maxCascadeSphereRadius
+    // 这就说明，此时的cameraPosition确实超出了maxShadowDistance，所以返回MAX_CASCADE_COUNT
+    if (OutOfMaxShadowDistance(i, lightIndex, material)) return MAX_CASCADE_COUNT;
+    return i;
+}
+ShadowData GetDirectionalShadowData (int index, Material material, ShadowMask mask)
+{
+    ShadowData data;
+    int cascadeIndex = GetCascadeIndex(index, material);
+    if (mask.enableShadowMask)
+    {
+        // If enable shadowMask, draw shadow with no fade
+        data.shadowStrength = abs(_DirectionalShadowData[index].x);
+        data.splitIndex = cascadeIndex == MAX_CASCADE_COUNT ? 0 :_DirectionalShadowData[index].z + cascadeIndex;
+        data.bakedShadowStrength = 1 - GetFadeWeight(material);
+        data.shadowMaskChannel = _DirectionalShadowData[index].w;
+    }
+    else
+    {
+        // If disable shadowMask && Camera2SurfaceDistance is out of maxShadowDistance, don't draw shadow at all
+        if (cascadeIndex == MAX_CASCADE_COUNT)
+        {
+            data.shadowStrength = 0;
+            data.splitIndex = 0;
+            data.shadowMaskChannel = 0;
+            data.bakedShadowStrength = 0;
+        }
+        else
+        {
+            data.shadowStrength = abs(_DirectionalShadowData[index].x) * GetFadeWeight(material);
+            data.splitIndex = _DirectionalShadowData[index].z + cascadeIndex;
+            data.bakedShadowStrength = 1 - saturate(GetFadeWeight(material));
+            data.shadowMaskChannel = _DirectionalShadowData[index].w;
+        }
+    }
+    if (data.splitIndex < 0)
+    {
+        // This light isn't a shadowLight
+        data.splitIndex = 0;
+        data.shadowStrength = 0;
+    }
+    return data;
+}
+ShadowData GetPointShadowData (int index, Material material, ShadowMask mask) {
+    ShadowData data;
+    // If surfaceDistance is out of shadowDistance && shadowMask is disabled
+    data.shadowStrength = abs(_PointShadowData[index].x);
+    data.splitIndex = _PointShadowData[index].z * 6;
+    // The closer camera2surface，the smaller bakedShadowStrength is, vice versa
+    data.bakedShadowStrength = 1 - saturate(GetFadeWeight(material));
+    data.shadowMaskChannel = _PointShadowData[index].w;
+
+    if (data.splitIndex < 0)
+    {
+        // This light isn't a shadowLight
+        data.splitIndex = 0;
+        data.shadowStrength = 0;
+    }
+    return data;
+}
+ShadowData GetSpotShadowData (int index, Material material, ShadowMask mask)
+{
+    ShadowData data;
+    data.shadowStrength = abs(_SpotShadowData[index].x);
+    data.splitIndex = _SpotShadowData[index].z;
+    // The closer camera2surface，the smaller bakedShadowStrength is, vice versa
+    data.bakedShadowStrength = 1 - saturate(GetFadeWeight(material));
+    data.shadowMaskChannel = _SpotShadowData[index].w;
+    
+    if (data.splitIndex < 0)
+    {
+        // This light isn't a shadowLight
+        data.splitIndex = 0;
+        data.shadowStrength = 0;
+    }
+    return data;
+}
+float SampleDirectionalShadowMap(float3 positionSS)
+{
+    float shadowStrength = 0.0f;
+    // Choose sample type by PCF
+    #if defined(DIRECTIONAL_FILTER_SETUP)
+        float weights[DIRECTIONAL_FILTER_SAMPLES];
+        float2 positions[DIRECTIONAL_FILTER_SAMPLES];
+        float4 size = _ShadowMapResolution.yyxx;
+        DIRECTIONAL_FILTER_SETUP(size, positionSS.xy, weights, positions);
+        for (int i = 0;i < DIRECTIONAL_FILTER_SAMPLES;i++)
+        {
+            float temp = SAMPLE_TEXTURE2D(_DirectionalShadowMap, SHADOW_SAMPLER, positions[i]);
+            #if UNITY_REVERSED_Z
+            temp = step(temp, positionSS.z);
+            #else
+            temp = step(positionSS.z, temp);
+            #endif
+            shadowStrength += weights[i] * temp;
+        }
+        return shadowStrength;
+    #else
+    float temp =  SAMPLE_TEXTURE2D(_DirectionalShadowMap, SHADOW_SAMPLER, positionSS.xy);
+    #if UNITY_REVERSED_Z
+    // the closer surface to camera, the bigger it's depth is
+    return step(temp, positionSS.z);
+    #else
+    return step(positionSS.z, temp);
+    #endif
+    #endif
+}
+float SampleOtherShadowMap(float3 positionSS)
+{
+    float shadowStrength = 0.0f;
+    // Choose sample type by PCF
+    #if defined(DIRECTIONAL_FILTER_SETUP)
+    float weights[DIRECTIONAL_FILTER_SAMPLES];
+    float2 positions[DIRECTIONAL_FILTER_SAMPLES];
+    float4 size = _ShadowMapResolution.yyxx;
+    DIRECTIONAL_FILTER_SETUP(size, positionSS.xy, weights, positions);
+    for (int i = 0;i < DIRECTIONAL_FILTER_SAMPLES;i++)
+    {
+        float temp = SAMPLE_TEXTURE2D_SHADOW(_OtherShadowMap, sampler_OtherShadowMap, float3(positions[i], positionSS.z));
+        shadowStrength += weights[i] * temp;
+    }
+    return shadowStrength;
+    #else
+    return SAMPLE_TEXTURE2D_SHADOW(_OtherShadowMap, sampler_OtherShadowMap, positionSS);
+    #endif
+}
+float GetBakedShadow(ShadowMask mask, int channel)
+{
+    return mask.shadowMaskColor[channel];
+}
+float3 GetDirectionalPositionSS(int index, ShadowData data, Material material)
+{
+    float4 positionBiasWS = float4(material.positionWS + GetDirectionalLightSampleOffset(index, material), 1.0f);
+    float4 positionSS = mul(_TransformWorldToShadowMapMatrices[data.splitIndex], positionBiasWS);
+    return float3(positionSS.xyz / positionSS.w);
+}
+float3 GetSpotPositionSS(int index, ShadowData data, Material material)
+{
+    float4 positionBiasWS = float4(material.positionWS + GetSpotLightSampleOffset(index, material), 1.0f);
+    float4 positionSS = mul(_SpotTransformWorldToShadowMapMatrices[data.splitIndex], positionBiasWS);
+    return float3(positionSS.xyz / positionSS.w);
+}
+float3 GetPointPositionSS(int index, float3 dirLight2Surface, Material material, ShadowData data)
+{
+    // 'Face' is the current sampleShadowPlane
+    float face = CubeMapFaceID(dirLight2Surface);
+    float weight = dot(dirLight2Surface, pointShadowPlanes[face]) * _PointShadowData2[index].x;
+    float3 offset = material.normalWS * weight;
+    float4 positionBiasWS = float4(material.positionWS + offset, 1.0f);
+    float4 positionSS = mul(_PointTransformWorldToShadowMapMatrices[data.splitIndex + (int)face], positionBiasWS);
+    return float3(positionSS.xyz / positionSS.w);
 }

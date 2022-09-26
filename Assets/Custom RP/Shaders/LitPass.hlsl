@@ -40,8 +40,8 @@ float4 LitPassFragment(v2f input) : SV_Target
 {
     float4 BaseColor = GetBaseColor(input.uv);
     Material material = SetupMaterial(BaseColor, input.positionWS, input.normalWS, input.positionVS);
-    GI gi = GetGlobalIllumination(input.uv_lightMap, material);
     ShadowMask shadowMask = GetShadowMask(input.uv_lightMap);
+    GI gi = GetGlobalIllumination(input.uv_lightMap, material, shadowMask);
     float4 LightedColor = GetLightedColor(gi, material, shadowMask);
     float4 EmissionColor = GetEmissionColor(input.uv);
     float4 FinalColor = GetFinalColor(BaseColor, LightedColor, EmissionColor);

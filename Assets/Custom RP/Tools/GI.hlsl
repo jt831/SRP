@@ -77,9 +77,10 @@ float3 GetGIDiffuseColor(float2 uv_lightMap, Material material)
         return 0.0f;
     #endif
 }
-GI GetGlobalIllumination(float2 uv_lightMap, Material material)
+GI GetGlobalIllumination(float2 uv_lightMap, Material material, ShadowMask shadowMask)
 {
     GI gi;
+    float3 shadowMaskColor = shadowMask.shadowMaskColor.xyz;
     gi.diffuse = GetGIDiffuseColor(uv_lightMap, material);
     return gi;
 }
