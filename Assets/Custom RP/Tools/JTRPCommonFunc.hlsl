@@ -46,7 +46,8 @@ float4 GetEmissionColor(float2 uv)
 {
     return SAMPLE_TEXTURE2D(_EmissionMap,sampler_EmissionMap, uv) * _EmissionColor;
 }
-float4 GetFinalColor(float4 BaseColor, float4 LightedColor = float4(1.0, 1.0, 1.0, 1.0), float4 EmissionColor = float4(0.0, 0.0, 0.0, 0.0))
+float4 GetFinalColor(float4 BaseColor,
+    float4 LightedColor = float4(1.0, 1.0, 1.0, 1.0), float4 EmissionColor = float4(0.0, 0.0, 0.0, 0.0))
 {
     return BaseColor * LightedColor + EmissionColor;
 }

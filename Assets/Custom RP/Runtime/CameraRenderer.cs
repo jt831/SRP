@@ -15,6 +15,7 @@ static class ConstNumber
     public const int MAXSpotLights = 10;
     public const int MAXShadowedLights = 4;
     public const int MAXCascades = 4;
+    public const int OtherShadowAtlasSplitNum = 6;
 }
 class Shadow
 {
@@ -53,6 +54,7 @@ class Shadow
     public Vector4[] _DirectionalCascadeSphere = new Vector4[ConstNumber.MAXDirectionalLights * ConstNumber.MAXCascades];
     public Vector4[] _SpotShadowData = new Vector4[ConstNumber.MAXSpotLights];
     public Vector4[] _PointShadowData = new Vector4[ConstNumber.MAXPointLights];
+    public Vector4[] _PointShadowData2 = new Vector4[ConstNumber.MAXPointLights];
     public Matrix4x4[] _SpotTransformWorldToShadowMapMatrices = new Matrix4x4[16];
     public Matrix4x4[] _PointTransformWorldToShadowMapMatrices = new Matrix4x4[16];
 
@@ -82,6 +84,7 @@ class Shadow
         if (_light.bakingOutput.lightmapBakeType == LightmapBakeType.Mixed
             && _light.bakingOutput.mixedLightingMode == MixedLightingMode.Shadowmask)
             this._enableShadowMask = true;
+       
         // Setup shadowData per Light
         if (IsShadowedLight())
         {
@@ -101,6 +104,11 @@ class Shadow
                     _PointShadowData[_pointLightCount++] = new Vector4(_light.shadowStrength, _lightIndex,
                         _pointShadowLightCount, _light.bakingOutput.occlusionMaskChannel);
                     _pointShadowLightCount++;
+                    this._splitNum = ConstNumber.OtherShadowAtlasSplitNum;
+                    this._splitSize = (int) _otherShadowProperties.resolution / _splitNum;
+                    float texelSize = 2f /_splitSize;
+                    float filterSize = texelSize * ((float)_otherShadowProperties.Fliter + 1f);
+                    _PointShadowData2[_pointLightCount].x = _light.shadowNormalBias * filterSize * 1.4142136f;
                     break;
             }
             _shadowLightCount++;
@@ -110,13 +118,13 @@ class Shadow
             switch (_light.type)
             {
                 case LightType.Directional:
-                    _DirectionalShadowData[_dirLightCount++] = new Vector4(_light.shadowStrength, -1, -1, 0);
+                    _DirectionalShadowData[_dirLightCount++] = new Vector4(0, -1, -1, 0);
                     break;
                 case LightType.Spot:
-                    _SpotShadowData[_spotLightCount++] = new Vector4(_light.shadowStrength, -1, -1, 0);
+                    _SpotShadowData[_spotLightCount++] = new Vector4(0, -1, -1, 0);
                     break;
                 case LightType.Point:
-                    _PointShadowData[_pointLightCount++] = new Vector4(_light.shadowStrength, -1, -1, 0);
+                    _PointShadowData[_pointLightCount++] = new Vector4(0, -1, -1, 0);
                     break;
             }
         }
@@ -220,11 +228,11 @@ class Shadow
     }
     public void DrawOtherShadow()
     {
-        int otherLightCount = _spotLightCount + _pointLightCount;
         int otherShadowLightCount = _spotShadowLightCount + _pointShadowLightCount;
         if (otherShadowLightCount > 0)
         {
-            this._splitNum = otherShadowLightCount <= 1 ? 1 : 2;
+            // divide OtherShadowMap into 36 for point light need 6 split per light, so JTRP can support upto 6 pointLights' realtimeShadow
+            this._splitNum = ConstNumber.OtherShadowAtlasSplitNum;
             this._splitSize = (int) _otherShadowProperties.resolution / _splitNum;
             int shadowMapResolution = (int)_otherShadowProperties.resolution;
             // Create a RenderTexture as a ShadowMap
@@ -251,6 +259,7 @@ class Shadow
                 if (lightIndex < 0) break;
                 DrawPointShadow(lightIndex, pointShadowLightIndex);
             }
+
             SetGlobalValue(ID_SpotTransformWorldToShadowMapMatrices, _SpotTransformWorldToShadowMapMatrices);
             SetGlobalValue(ID_PointTransformWorldToShadowMapMatrices, _PointTransformWorldToShadowMapMatrices);
             _shadowBuffer.EndSample(shadowBufferName);
@@ -271,6 +280,9 @@ class Shadow
             int splitIndex = splitOffset + i;
             _results.ComputePointShadowMatricesAndCullingPrimitives(lightIndex, (CubemapFace)i, 0f,
                 out Matrix4x4 viewMatrix, out Matrix4x4 projMatrix, out ShadowSplitData splitData);
+            /*viewMatrix.m11 = -viewMatrix.m11;
+            viewMatrix.m12 = -viewMatrix.m12;
+            viewMatrix.m13 = -viewMatrix.m13;*/
             Matrix4x4 m = projMatrix * viewMatrix;
             Vector2 offset = SetupSplit(splitIndex);
             _PointTransformWorldToShadowMapMatrices[splitIndex] = TransformWorldToShadowMapMatrix(m, offset, _splitNum);
@@ -387,6 +399,7 @@ class Lighting
         ID_DirectionalLightDirection = Shader.PropertyToID("_DirectionalLightDirection"),
         // Point Light
         ID_PointShadowData = Shader.PropertyToID("_PointShadowData"),
+        ID_PointShadowData2 = Shader.PropertyToID("_PointShadowData2"),
         ID_PointLightCount = Shader.PropertyToID("_PointLightCount"),
         ID_PointLightColors = Shader.PropertyToID("_PointLightColors"),
         ID_PointLightPosition = Shader.PropertyToID("_PointLightPosition"),
@@ -487,6 +500,7 @@ class Lighting
         _lightBuffer.SetGlobalVectorArray(ID_DirectionalLightDirection,_DirectionalLightDirections);
         _lightBuffer.SetGlobalVectorArray(ID_DirectionalShadowData, _shadow._DirectionalShadowData);
         _lightBuffer.SetGlobalVectorArray(ID_PointShadowData, _shadow._PointShadowData);
+        _lightBuffer.SetGlobalVectorArray(ID_PointShadowData2, _shadow._PointShadowData2);
         _lightBuffer.SetGlobalVectorArray(ID_SpotShadowData, _shadow._SpotShadowData);
         
         ExecuteBuffer();

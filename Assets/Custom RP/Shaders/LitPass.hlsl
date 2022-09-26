@@ -31,7 +31,7 @@ v2f LitPassVertex(Attributes input)
     output.positionCS = TransformObjectToHClip(input.positionOS);
     output.positionWS = TransformObjectToWorld(input.positionOS);
     output.positionVS = TransformWorldToView(output.positionWS);
-    output.normalWS   = SafeNormalize(TransformObjectToWorldNormal(input.normalOS));
+    output.normalWS   = normalize(TransformObjectToWorldNormal(input.normalOS));
     
     return output;
 }

@@ -13,36 +13,6 @@
 #include "Assets/Custom RP/Tools/Material.hlsl"
 #include "Assets/Custom RP/Tools/Shadow.hlsl"
 
-CBUFFER_START(_CustomLight)
-int _LightCount;
-float _MaxShadowDistance;
-float _Fade;
-float _LightWidth;
-float4 _ShadowMapResolution;
-// Directional Light
-int _DirectionalLightCount;
-int _DirectionalLightCascadeCount;
-float4 _DirectionalLightColors[MAX_DIRECTIONAL_LIGHT_COUNT];
-float4 _DirectionalLightDirection[MAX_DIRECTIONAL_LIGHT_COUNT];
-float4 _DirectionalShadowData[MAX_DIRECTIONAL_LIGHT_COUNT];
-float4 _DirectionalCascadeSphere[MAX_SHADOWED_DIRECTIONAL_LIGHT_COUNT * MAX_CASCADE_COUNT];
-float4x4 _TransformWorldToShadowMapMatrices[MAX_SHADOWED_DIRECTIONAL_LIGHT_COUNT * MAX_CASCADE_COUNT];
-// Point Light
-int _PointLightCount;
-float4 _PointLightColors[MAX_POINT_LIGHT_COUNT];
-float4 _PointLightPosition[MAX_POINT_LIGHT_COUNT];
-float4 _PointShadowData[MAX_POINT_LIGHT_COUNT];
-float4x4 _PointTransformWorldToShadowMapMatrices[16];
-// Spot Light
-int _SpotLightCount;
-float4 _SpotLightColors[MAX_SPOT_LIGHT_COUNT];
-float4 _SpotLightPosition[MAX_SPOT_LIGHT_COUNT];
-float4 _SpotLightDirection[MAX_SPOT_LIGHT_COUNT];
-float4 _SpotLightAngle[MAX_SPOT_LIGHT_COUNT];
-float4 _SpotShadowData[MAX_SPOT_LIGHT_COUNT];
-float4x4 _SpotTransformWorldToShadowMapMatrices[16];
-CBUFFER_END
-
 struct Light
 {
     float3 color;
@@ -123,7 +93,7 @@ ShadowData GetDirectionalShadowData (int index, Material material, ShadowMask ma
 ShadowData GetPointShadowData (int index, Material material, ShadowMask mask) {
     ShadowData data;
     // If surfaceDistance is out of shadowDistance && shadowMask is disabled
-    data.shadowStrength = abs(_PointShadowData[index].x) * GetFadeWeight(material);
+    data.shadowStrength = abs(_PointShadowData[index].x);
     data.splitIndex = _PointShadowData[index].z * 6 + index;
     // The closer camera2surface，the smaller bakedShadowStrength is, vice versa
     data.bakedShadowStrength = 1 - saturate(GetFadeWeight(material));
@@ -133,8 +103,7 @@ ShadowData GetPointShadowData (int index, Material material, ShadowMask mask) {
 ShadowData GetSpotShadowData (int index, Material material, ShadowMask mask)
 {
     ShadowData data;
-    // If surfaceDistance is out of shadowDistance && shadowMask is disabled
-    data.shadowStrength = abs(_SpotShadowData[index].x) * GetFadeWeight(material);
+    data.shadowStrength = abs(_SpotShadowData[index].x);
     data.splitIndex = _SpotShadowData[index].z;
     // The closer camera2surface，the smaller bakedShadowStrength is, vice versa
     data.bakedShadowStrength = 1 - saturate(GetFadeWeight(material));
@@ -143,7 +112,7 @@ ShadowData GetSpotShadowData (int index, Material material, ShadowMask mask)
 }
 float SampleShadowMap(float3 positionSS)
 {
-    float shadowStrength;
+    float shadowStrength = 0.0f;
     // Choose sample type by PCF
     #if defined(DIRECTIONAL_FILTER_SETUP)
         float weights[DIRECTIONAL_FILTER_SAMPLES];
@@ -152,13 +121,7 @@ float SampleShadowMap(float3 positionSS)
         DIRECTIONAL_FILTER_SETUP(size, positionSS.xy, weights, positions);
         for (int i = 0;i < DIRECTIONAL_FILTER_SAMPLES;i++)
         {
-            float temp = SAMPLE_TEXTURE2D_SHADOW(_DirectionalShadowAtlas, SHADOW_SAMPLER, positions[i]);
-            #if UNITY_REVERSED_Z
-            //the closer surface to camera, the bigger it's depth is
-            temp = step(temp, positionSS.z);
-            #else
-            temp = step(positionSS.z, temp);
-            #endif
+            float temp = SAMPLE_TEXTURE2D_SHADOW(_DirectionalShadowAtlas, SHADOW_SAMPLER, float3(positions[i], positionSS.z));
             shadowStrength += weights[i] * temp;
         }
         return shadowStrength;
@@ -168,7 +131,7 @@ float SampleShadowMap(float3 positionSS)
 }
 float SampleOtherShadowMap(float3 positionSS)
 {
-    float shadowStrength;
+    float shadowStrength = 0.0f;
     // Choose sample type by PCF
     #if defined(DIRECTIONAL_FILTER_SETUP)
     float weights[DIRECTIONAL_FILTER_SAMPLES];
@@ -177,13 +140,7 @@ float SampleOtherShadowMap(float3 positionSS)
     DIRECTIONAL_FILTER_SETUP(size, positionSS.xy, weights, positions);
     for (int i = 0;i < DIRECTIONAL_FILTER_SAMPLES;i++)
     {
-        float temp = SAMPLE_TEXTURE2D_SHADOW(_OtherShadowAtlas, SHADOW_SAMPLER, positions[i]);
-        #if UNITY_REVERSED_Z
-        //the closer surface to camera, the bigger it's depth is
-        temp = step(temp, positionSS.z);
-        #else
-        temp = step(positionSS.z, temp);
-        #endif
+        float temp = SAMPLE_TEXTURE2D_SHADOW(_OtherShadowAtlas, SHADOW_SAMPLER, float3(positions[i], positionSS.z));
         shadowStrength += weights[i] * temp;
     }
     return shadowStrength;
@@ -200,14 +157,19 @@ float3 GetDirectionalPositionSS(ShadowData data, float3 positionWS)
     float4 positionSS = mul(_TransformWorldToShadowMapMatrices[data.splitIndex], float4(positionWS, 1.0f));
     return float3(positionSS.xyz / positionSS.w);
 }
-float3 GetSpotPositionSS(ShadowData data, float3 positionWS)
+float3 GetSpotPositionSS(int index, ShadowData data, Material material)
 {
-    float4 positionSS = mul(_SpotTransformWorldToShadowMapMatrices[data.splitIndex], float4(positionWS, 1.0f));
+    float4 positionBiasWS = float4(material.positionWS + GetSpotLightSampleOffset(index, material), 1.0f);
+    float4 positionSS = mul(_SpotTransformWorldToShadowMapMatrices[data.splitIndex], positionBiasWS);
     return float3(positionSS.xyz / positionSS.w);
 }
-float3 GetPointPositionSS(ShadowData data, float3 positionWS, int offset)
+float3 GetPointPositionSS(int index, float dirLight2Surface, Material material, ShadowData data)
 {
-    float4 positionSS = mul(_PointTransformWorldToShadowMapMatrices[data.splitIndex + offset], float4(positionWS, 1.0f));
+    float face = CubeMapFaceID(dirLight2Surface);
+    float weight = dot(dirLight2Surface, pointShadowPlanes[face]) * _PointShadowData2[index].x;
+    float3 offset = material.normalWS * weight;
+    float4 positionBiasWS = float4(material.positionWS + offset, 1.0f);
+    float4 positionSS = mul(_PointTransformWorldToShadowMapMatrices[data.splitIndex + (int)face], positionBiasWS);
     return float3(positionSS.xyz / positionSS.w);
 }
 float GetDirectionalLightRealtimeShadow(ShadowData data, Material material)
@@ -238,19 +200,17 @@ float GetDirectionalLightAttenuation(int index, Material material, ShadowMask sh
 }
 float GetPointLightRealtimeShadow(int index, ShadowData data, Material material)
 {
-    if (data.shadowStrength <= 0.0f) return 1.0f;
     float3 dirLight2Surface = normalize(material.positionWS - _PointLightPosition[index].xyz);
-    float3 disLight2Surface = length(material.positionWS - _PointLightPosition[index].xyz);
+    float disLight2Surface = length(material.positionWS - _PointLightPosition[index].xyz);
     float distance = max(0.001, disLight2Surface);
     float range = max(0.001, _PointLightPosition[index].w);
-    float attenuation =  saturate((1 - saturate(distance / range)) / distance);
-
-    float offset = CubeMapFaceID(dirLight2Surface);
-    float weight = dot(disLight2Surface, pointShadowPlanes[offset]);
-    float3 positionBiasWS = material.positionWS + material.normalWS * weight;
-    float3 positionSS = GetPointPositionSS(data, positionBiasWS, offset);
-    float shadowStrength = SampleOtherShadowMap(positionSS);
-    return attenuation * shadowStrength;
+    float attenuation = saturate((1 - saturate(distance / range)) / distance);
+    
+    float3 positionSS = GetPointPositionSS(index, dirLight2Surface, material, data);
+    float shadowStrength = data.shadowStrength <= 0.0f ? 1.0f : SampleOtherShadowMap(positionSS);
+    lerp(1.0f, shadowStrength, data.shadowStrength);
+    
+    return attenuation ;
 }
 float GetPointLightAttenuation(int index, Material material, ShadowMask shadowMask)
 {
@@ -260,16 +220,16 @@ float GetPointLightAttenuation(int index, Material material, ShadowMask shadowMa
     if (shadowMask.enableShadowMask)
     {
         float bakedShadow = GetBakedShadow(shadowMask, data.shadowMaskChannel);
-        shadowStrength = realtimeShadow;
+        shadowStrength = lerp(realtimeShadow, bakedShadow, data.bakedShadowStrength);
     }
     else
         shadowStrength = realtimeShadow;
-    
+
     return shadowStrength;
 }
 float GetSpotLightRealtimeShadow(int index, Material material, ShadowData data, float3 LightDirection)
 {
-    if (data.shadowStrength <= 0.0f) return 1.0f;
+    // Control the area of SpotLight(without shadow)
     float3 dirSurface2Light = normalize(_SpotLightPosition[index].xyz - material.positionWS);
     float disLight2Surface = max(0.001, length(_SpotLightPosition[index].xyz - material.positionWS));
     float range = max(0.001, _SpotLightPosition[index].w);
@@ -277,10 +237,10 @@ float GetSpotLightRealtimeShadow(int index, Material material, ShadowData data, 
     float angleAttenuation = saturate(dot(dirSurface2Light, LightDirection) * angles.x + angles.y);
     float rangeAttenuation = 1 - saturate(disLight2Surface / range);
     float attenuation = rangeAttenuation * angleAttenuation / Square(disLight2Surface);
-
-    float3 positionBiasWS = material.positionWS + material.normalWS;
-    float3 positionSS = GetSpotPositionSS(data, positionBiasWS);
-    float shadowStrength = SampleOtherShadowMap(positionSS);
+    // Control the shadow of SpotLight
+    float3 positionSS = GetSpotPositionSS(index, data, material);
+    float shadowStrength = data.shadowStrength <= 0.0f ? 1.0f : SampleOtherShadowMap(positionSS);
+    
     return attenuation * shadowStrength;
 }
 float GetSpotLightAttenuation(int index, Material material, ShadowMask shadowMask, float3 LightDirection)
@@ -291,7 +251,7 @@ float GetSpotLightAttenuation(int index, Material material, ShadowMask shadowMas
     if (shadowMask.enableShadowMask)
     {
         float bakedShadow = GetBakedShadow(shadowMask, data.shadowMaskChannel);
-        shadowStrength = realtimeShadow;
+        shadowStrength = lerp(realtimeShadow, bakedShadow, data.bakedShadowStrength);
     }
     else
         shadowStrength = realtimeShadow;

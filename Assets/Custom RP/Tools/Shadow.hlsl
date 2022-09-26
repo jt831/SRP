@@ -107,7 +107,35 @@ struct ShadowMask
 };
 
 CBUFFER_START(_CustomShadow)
+float _Fade;
+int   _LightCount;
+float _LightWidth;
+float _MaxShadowDistance;
 float _SampleBlockerDepthRadius;
+float4 _ShadowMapResolution;
+// Directional Light
+int _DirectionalLightCount;
+int _DirectionalLightCascadeCount;
+float4 _DirectionalLightColors[MAX_DIRECTIONAL_LIGHT_COUNT];
+float4 _DirectionalLightDirection[MAX_DIRECTIONAL_LIGHT_COUNT];
+float4 _DirectionalShadowData[MAX_DIRECTIONAL_LIGHT_COUNT];
+float4 _DirectionalCascadeSphere[MAX_SHADOWED_DIRECTIONAL_LIGHT_COUNT * MAX_CASCADE_COUNT];
+float4x4 _TransformWorldToShadowMapMatrices[MAX_SHADOWED_DIRECTIONAL_LIGHT_COUNT * MAX_CASCADE_COUNT];
+// Point Light
+int _PointLightCount;
+float4 _PointLightColors[MAX_POINT_LIGHT_COUNT];
+float4 _PointLightPosition[MAX_POINT_LIGHT_COUNT];
+float4 _PointShadowData[MAX_POINT_LIGHT_COUNT];
+float4 _PointShadowData2[MAX_POINT_LIGHT_COUNT];
+float4x4 _PointTransformWorldToShadowMapMatrices[16];
+// Spot Light
+int _SpotLightCount;
+float4 _SpotLightColors[MAX_SPOT_LIGHT_COUNT];
+float4 _SpotLightPosition[MAX_SPOT_LIGHT_COUNT];
+float4 _SpotLightDirection[MAX_SPOT_LIGHT_COUNT];
+float4 _SpotLightAngle[MAX_SPOT_LIGHT_COUNT];
+float4 _SpotShadowData[MAX_SPOT_LIGHT_COUNT];
+float4x4 _SpotTransformWorldToShadowMapMatrices[16];
 CBUFFER_END
 
 float GetBlockerDepth(float3 positionSS, float lightWidth)
@@ -153,4 +181,14 @@ float PCSS(float3 positionSS, float lightWidth)
         return PCF(positionSS, radius);
     }
     return 0;
+}
+float3 GetSpotLightSampleOffset(int index, Material material)
+{
+    /*
+     * The bigger angle of 'surfaceNormal to light' is , the bigger offset is. 
+     */
+    float3 lightDirection = normalize(float3(_SpotLightDirection[index].x + 1, _SpotLightDirection[index].yz));
+    float weight = 1 - saturate(dot(material.normalWS, lightDirection));
+    float3 offset = material.normalWS * weight;
+    return offset;
 }

@@ -19,8 +19,8 @@ MonoBehaviour:
   shadow:
     directional:
       distance: 200
-      resolution: 2048
-      Fliter: 0
+      resolution: 8192
+      Fliter: 4
       fade: 0.5
       shadowSlopBias: 0.5
       sampleBlockerDepthRadius: 0.001
@@ -32,6 +32,6 @@ MonoBehaviour:
         ratio3: 0.7
     other:
       distance: 49.84
-      resolution: 1024
+      resolution: 8192
       Fliter: 0
       fade: 0.5
