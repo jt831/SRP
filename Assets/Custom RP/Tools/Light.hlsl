@@ -78,6 +78,7 @@ float GetSpotLightRealtimeShadow(int index, Material material, ShadowData data, 
     // Control the shadow of SpotLight
     float3 positionSS = GetSpotPositionSS(index, data, material);
     float shadowStrength = data.shadowStrength <= 0.0f ? 1.0f : SampleOtherShadowMap(positionSS);
+    shadowStrength = lerp(1.0f, shadowStrength, data.shadowStrength);
     
     return attenuation * shadowStrength;
 }
@@ -89,7 +90,7 @@ float GetSpotLightAttenuation(int index, Material material, ShadowMask shadowMas
     if (shadowMask.enableShadowMask)
     {
         float bakedShadow = GetBakedShadow(shadowMask, data.shadowMaskChannel);
-        shadowStrength = lerp(realtimeShadow, bakedShadow, data.bakedShadowStrength);
+        shadowStrength = min(bakedShadow, lerp(realtimeShadow, bakedShadow, data.bakedShadowStrength));
     }
     else
         shadowStrength = realtimeShadow;

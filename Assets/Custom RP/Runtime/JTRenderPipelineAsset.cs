@@ -23,14 +23,15 @@ public class JTRenderPipelineAsset : RenderPipelineAsset
         SRPBatching = true,
         DynamicBatching = false
     };
-    [SerializeField] private ShadowProperties shadow = default;
-    
+    [SerializeField] private PostFX postFX = new PostFX();
+
+    [SerializeField] private ShadowProperties shadow;
     // Create an pipeline instance to render 
     protected override RenderPipeline CreatePipeline()
     {
         DirectionalShadowProperties directionalShadow = shadow.directional;
         OtherShadowProperties otherShadow = shadow.other;
-        return new JTRenderPipeline(batching, directionalShadow, otherShadow);
+        return new JTRenderPipeline(batching, postFX, directionalShadow, otherShadow);
     }
     
 }

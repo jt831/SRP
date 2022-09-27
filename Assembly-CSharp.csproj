@@ -41,6 +41,7 @@
     <ImplicitlyExpandDesignTimeFacades>false</ImplicitlyExpandDesignTimeFacades>
   </PropertyGroup>
   <ItemGroup>
+     <Compile Include="Assets\Custom RP\Runtime\PFXSettings.cs" />
      <Compile Include="Assets\Custom RP\Scripts\ContainerVis.cs" />
      <Compile Include="Assets\Custom RP\Runtime\JTRenderPipeline.cs" />
      <Compile Include="Assets\Custom RP\Scripts\CloudMaster.cs" />
@@ -53,6 +54,7 @@
      <Compile Include="Assets\Custom RP\Runtime\CameraRenderer.cs" />
      <Compile Include="Assets\Custom RP\Scripts\ManyInstances.cs" />
      <Compile Include="Assets\Custom RP\Scripts\ShadowPropertiescs.cs" />
+     <Compile Include="Assets\Custom RP\Scripts\PFXStack.cs" />
      <None Include="Assets\Custom RP\Shaders\UnlitPass.hlsl" />
      <None Include="Assets\Custom RP\Tools\GI.hlsl" />
      <None Include="Assets\Custom RP\Shaders\UnlitInstancePass.hlsl" />
@@ -64,6 +66,7 @@
      <None Include="Assets\Custom RP\Tools\CommonTools.hlsl" />
      <None Include="Assets\Custom RP\Shaders\CustomShadow.hlsl" />
      <None Include="Assets\Custom RP\Shaders\MetaPass.hlsl" />
+     <None Include="Assets\Custom RP\Shaders\Blur.shader" />
      <None Include="Assets\Custom RP\Shaders\Unilt.shader" />
      <None Include="Assets\Custom RP\Shaders\UnlitInstance.shader" />
      <None Include="Assets\Custom RP\Shaders\Lit.shader" />

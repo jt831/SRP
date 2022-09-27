@@ -311,7 +311,7 @@ class Shadow
         _results.ComputeSpotShadowMatricesAndCullingPrimitives(lightIndex, 
             out Matrix4x4 viewMatrix, out Matrix4x4 projMatrix, out ShadowSplitData splitData);
         Matrix4x4 m = projMatrix * viewMatrix;
-        // When spotLights draw after pointLights in OtherShadowMap
+        // 'splitOffset' only useful when spotLights draw after pointLights in OtherShadowMap
         int splitOffset = _pointShadowLightCount * 6 + spotShadowLightIndex;
         Vector2 offset = SetupSplit(splitOffset);
         _SpotTransformWorldToShadowMapMatrices[spotShadowLightIndex] = TransformWorldToShadowMapMatrix(m, offset, _splitNum);
@@ -528,21 +528,23 @@ public partial class CameraRenderer
     private CommandBuffer _buffer = new CommandBuffer(){name = BufferName};
     private CullingResults _results;
     private ScriptableRenderContext _context;
-    private UnityEngine.Camera _camera;
+    private Camera _camera;
     private Batching _batching;
     private DirectionalShadowProperties _dirShadowProperties;
     private OtherShadowProperties _otherShadowProperties;
     private Lighting _lighting;
     private Shadow _shadow;
+    private PFXStack _pfxStack;
+    private PostFX _pfxSettings;
     private float _shadowDistance;
-
     private static int
         ID_ViewDirection = Shader.PropertyToID("_ViewDirection"),
         ID_ShadowMapResolution = Shader.PropertyToID("_ShadowMapResolution"),
         ID_MaxShadowDistance = Shader.PropertyToID("_MaxShadowDistance"),
         ID_Fade = Shader.PropertyToID("_Fade"),
         ID_SampleBlockerDepthRadius = Shader.PropertyToID("_SampleBlockerDepthRadius"),
-        ID_LightWidth = Shader.PropertyToID("_LightWidth");
+        ID_LightWidth = Shader.PropertyToID("_LightWidth"),
+        ID_FrameBuffer = Shader.PropertyToID("_CameraFrameBuffer");
     public static string[] filterKeywords =
     {
         "_DIRECTIONAL_PCSS",
@@ -550,7 +552,8 @@ public partial class CameraRenderer
         "_DIRECTIONAL_PCF5",
         "_DIRECTIONAL_PCF7"
     };
-    public void Render(ScriptableRenderContext context, UnityEngine.Camera camera, Batching batching, 
+    public void Render(ScriptableRenderContext context, Camera camera, 
+        Batching batching, PostFX pfxSettings,
         DirectionalShadowProperties dirShadowProperties, OtherShadowProperties otherShadowProperties)
     {
         /* 0. Render objects' shadows
@@ -566,6 +569,9 @@ public partial class CameraRenderer
         this._otherShadowProperties = otherShadowProperties;
         this._lighting = new Lighting();
         this._shadow = new Shadow();
+        this._pfxStack = new PFXStack(context, camera, pfxSettings.settings);
+        this._pfxSettings = pfxSettings;
+        
         PrepareBuffer();
         if (!Culling()) return;
         RenderShadows();
@@ -604,7 +610,15 @@ public partial class CameraRenderer
     {
         // Setup camera
         _context.SetupCameraProperties(_camera);
+        // Setup pfxStack and Get FrameBuffer as the input of pfxStack
+        if (_pfxSettings.active && _pfxStack.pfxSettings != null)
+        {
+            Debug.Log("Active PFX");
+            _buffer.GetTemporaryRT(ID_FrameBuffer, _camera.pixelWidth, _camera.pixelHeight, 32, FilterMode.Bilinear, RenderTextureFormat.Default);
+            _buffer.SetRenderTarget(ID_FrameBuffer, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store);
+        }
         // Setup CommandBuffer
+        
         _buffer.ClearRenderTarget(true, true, Color.clear);
         _buffer.BeginSample(BufferName);
         SetGlobalValue(_camera);
@@ -649,6 +663,11 @@ public partial class CameraRenderer
         // Draw Gizmos
         DrawGizmos();
         
+        // Apply Post Effects
+        if (_pfxSettings.active && _pfxStack.pfxSettings != null) 
+            _pfxStack.Render(ref _buffer, ID_FrameBuffer, BuiltinRenderTextureType.CameraTarget);
+        CleanUp();
+        
         // Release temporalRT(As a shadowMap) before Submit
         _shadow.Cleanup();
     }
@@ -689,5 +708,9 @@ public partial class CameraRenderer
     void PrepareBuffer()
     {
         _buffer.name = _camera.name;
+    }
+    private void CleanUp()
+    {
+        _buffer.ReleaseTemporaryRT(ID_FrameBuffer);
     }
 }

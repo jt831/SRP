@@ -364,11 +364,13 @@
 "Assets/Custom RP/Runtime/JTRenderPipeline.cs"
 "Assets/Custom RP/Runtime/JTRenderPipelineAsset.cs"
 "Assets/Custom RP/Runtime/JTRenderPipelineEditor.cs"
+"Assets/Custom RP/Runtime/PFXSettings.cs"
 "Assets/Custom RP/Scripts/CloudMaster.cs"
 "Assets/Custom RP/Scripts/ContainerVis.cs"
 "Assets/Custom RP/Scripts/CustomLightEditor.cs"
 "Assets/Custom RP/Scripts/JTRPShaderGUI.cs"
 "Assets/Custom RP/Scripts/ManyInstances.cs"
+"Assets/Custom RP/Scripts/PFXStack.cs"
 "Assets/Custom RP/Scripts/ShadowPropertiescs.cs"
 "Assets/Custom RP/Scripts/VarMaterial.cs"
 -langversion:9.0

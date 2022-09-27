@@ -16,11 +16,14 @@ MonoBehaviour:
     GPUInstancing: 0
     SRPBatching: 1
     DynamicBatching: 1
+  postFX:
+    active: 1
+    settings: {fileID: 11400000, guid: aa407646a0643f0489c1da92d49ce181, type: 2}
   shadow:
     directional:
       distance: 200
       resolution: 8192
-      Fliter: 4
+      Fliter: 0
       fade: 0.5
       shadowSlopBias: 0.5
       sampleBlockerDepthRadius: 0.001
