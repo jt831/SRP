@@ -1,16 +1,14 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
 
 public class PFXStack
 {
     private const string bufferName = "PFX";
-    private CommandBuffer _buffer = new CommandBuffer()
-    {
-        name = bufferName
-    };
+    private CommandBuffer _buffer = new CommandBuffer() {name = bufferName};
 
     private ScriptableRenderContext _context;
     private Camera _camera;
@@ -22,21 +20,26 @@ public class PFXStack
         this._context = context;
         this._camera = camera;
         this.pfxSettings = camera.cameraType <= CameraType.SceneView ? settings : null;
-
-        _material = new Material(settings.shader);
+        
+        if (pfxSettings != null) _material = new Material(pfxSettings.shader);
     }
 
-    private static int
-        ID_GlobalTexture = Shader.PropertyToID("GlobalTex");
-    public void Render(ref CommandBuffer buffer, RenderTargetIdentifier src, RenderTargetIdentifier dest)
+    private static int ID_GlobalTexture = Shader.PropertyToID("GlobalTex");
+    public void Render(RenderTargetIdentifier src, RenderTargetIdentifier dest)
     {
-        buffer.SetGlobalTexture(ID_GlobalTexture, src);
-        buffer.SetRenderTarget(dest, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store);
-        buffer.DrawProcedural(Matrix4x4.identity, _material, 0, MeshTopology.Triangles, 3);
+        _buffer.SetGlobalTexture(ID_GlobalTexture, src);
+        _buffer.SetRenderTarget(dest, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store);
+        _buffer.DrawProcedural(Matrix4x4.identity, _material, 0, MeshTopology.Triangles, 3);
+        ExecuteBuffer();
     }
     private void ExecuteBuffer()
     {
         _context.ExecuteCommandBuffer(_buffer);
         _buffer.Clear();
     }
+    /*private void SetMaterial()
+    {
+        _material.SetVector("minBoxPoint", _container.position - _container.localScale / 2);
+        _material.SetVector("maxBoxPoint", _container.position + _container.localScale / 2);
+    }*/
 }

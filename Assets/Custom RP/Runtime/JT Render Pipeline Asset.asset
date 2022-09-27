@@ -18,7 +18,7 @@ MonoBehaviour:
     DynamicBatching: 1
   postFX:
     active: 1
-    settings: {fileID: 11400000, guid: aa407646a0643f0489c1da92d49ce181, type: 2}
+    settings: {fileID: 11400000, guid: 68d524f726aaaf74ca165febcddc6587, type: 2}
   shadow:
     directional:
       distance: 200

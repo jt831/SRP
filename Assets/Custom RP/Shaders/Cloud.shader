@@ -1,10 +1,6 @@
 Shader "JTRP/Clouds"
 {
-   Properties
-   {
-       [MainTexture] _MainTex ("Texture", 2D) = "white" {}
-   }
-   Subshader
+    Subshader
    {
        HLSLINCLUDE
         #include "UnityCG.cginc"
@@ -30,12 +26,13 @@ Shader "JTRP/Clouds"
            float3 maxBoxPoint;
            CBUFFER_END
            
-           TEXTURE2D(_MainTex);     SAMPLER(sampler_MainTex);
+           TEXTURE2D(GlobalTex);   SAMPLER(sampler_GlobalTex);
            
            struct Attributes
            {
                float3 positionOS : POSITION;
                float2 uv : TEXCOORD0;
+               uint vertexID : SV_VertexID;
            };
 
            struct v2f
@@ -47,16 +44,29 @@ Shader "JTRP/Clouds"
 
            v2f VolumeCloudPassVertex(Attributes input)
            {
-               v2f output;
-               output.uv = input.uv;
-               output.positionCS = TransformObjectToHClip(input.positionOS);
+                v2f output;
+                // Draw a single triangle to include screen
+                output.positionCS = float4(
+	                input.vertexID <= 1 ? -1.0 : 3.0,
+	                input.vertexID == 1 ? 3.0 : -1.0,
+	                0.0, 1.0
+                );
+                output.uv = float2(
+	                input.vertexID <= 1 ? 0.0 : 2.0,
+	                input.vertexID == 1 ? 2.0 : 0.0
+                );
+                // Avoid uv flip
+                if (_ProjectionParams.x < 0.0f)
+                {
+                    output.uv.y = 1 - output.uv.y;
+                }
                float3 viewDir = mul(unity_CameraInvProjection, float4(input.uv * 2 - 1, 0, -1));
                output.viewDirection = mul(unity_CameraToWorld, float4(viewDir, 0));
 
                return output;
            }
 
-           float2 GetRayToContinerInformation(float3 minBoxPoint, float3 maxBoxPoint, float3 lightPos, float3 lightDir)
+           float2 GetRayToContinerInfo(float3 minBoxPoint, float3 maxBoxPoint, float3 lightPos, float3 lightDir)
            {
                float3 t0 = (minBoxPoint - lightPos) / lightDir;
                float3 t1 = (maxBoxPoint - lightPos) / lightDir;
@@ -75,15 +85,15 @@ Shader "JTRP/Clouds"
            
            float4 VolumeCloudPassFragment(v2f input) : SV_Target
            {
-               float4 finalColor = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv);
+               float4 finalColor = SAMPLE_TEXTURE2D_LOD(GlobalTex, sampler_GlobalTex, input.uv, 0);
                float3 lightPos = _WorldSpaceCameraPos;
-               float3 lightDir = SafeNormalize(input.viewDirection);
-               float2 ray2ContainerInfo = GetRayToContinerInformation(minBoxPoint, maxBoxPoint, lightPos, lightDir);
+               float3 lightDir = normalize(input.viewDirection);
+               float2 ray2ContainerInfo = GetRayToContinerInfo(minBoxPoint, maxBoxPoint, lightPos, lightDir);
                float dst2Box = ray2ContainerInfo.x;
                float dstInsideBox = ray2ContainerInfo.y;
-               //if (dstInsideBox > 0) finalColor = 0.0f;
+               if (dstInsideBox <= 0) finalColor = 0.0f;
                
-               return 0;
+               return finalColor;
            }
            ENDHLSL
        }

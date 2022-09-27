@@ -26,7 +26,7 @@ public class JTRenderPipelineAsset : RenderPipelineAsset
     [SerializeField] private PostFX postFX = new PostFX();
 
     [SerializeField] private ShadowProperties shadow;
-    // Create an pipeline instance to render 
+    // Create an pipeline instance to render
     protected override RenderPipeline CreatePipeline()
     {
         DirectionalShadowProperties directionalShadow = shadow.directional;

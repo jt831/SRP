@@ -553,7 +553,7 @@ public partial class CameraRenderer
         "_DIRECTIONAL_PCF7"
     };
     public void Render(ScriptableRenderContext context, Camera camera, 
-        Batching batching, PostFX pfxSettings,
+        Batching batching, PostFX ppSettings, 
         DirectionalShadowProperties dirShadowProperties, OtherShadowProperties otherShadowProperties)
     {
         /* 0. Render objects' shadows
@@ -569,9 +569,8 @@ public partial class CameraRenderer
         this._otherShadowProperties = otherShadowProperties;
         this._lighting = new Lighting();
         this._shadow = new Shadow();
-        this._pfxStack = new PFXStack(context, camera, pfxSettings.settings);
-        this._pfxSettings = pfxSettings;
-        
+        this._pfxSettings = ppSettings;
+        this._pfxStack = new PFXStack(context, camera, _pfxSettings.settings);
         PrepareBuffer();
         if (!Culling()) return;
         RenderShadows();
@@ -617,6 +616,7 @@ public partial class CameraRenderer
             _buffer.GetTemporaryRT(ID_FrameBuffer, _camera.pixelWidth, _camera.pixelHeight, 32, FilterMode.Bilinear, RenderTextureFormat.Default);
             _buffer.SetRenderTarget(ID_FrameBuffer, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store);
         }
+        
         // Setup CommandBuffer
         
         _buffer.ClearRenderTarget(true, true, Color.clear);
@@ -664,10 +664,11 @@ public partial class CameraRenderer
         DrawGizmos();
         
         // Apply Post Effects
-        if (_pfxSettings.active && _pfxStack.pfxSettings != null) 
-            _pfxStack.Render(ref _buffer, ID_FrameBuffer, BuiltinRenderTextureType.CameraTarget);
-        CleanUp();
-        
+        if (_pfxSettings.active && _pfxStack.pfxSettings != null)
+        {
+            _pfxStack.Render(ID_FrameBuffer, BuiltinRenderTextureType.CameraTarget);
+            CleanUp();
+        }
         // Release temporalRT(As a shadowMap) before Submit
         _shadow.Cleanup();
     }
