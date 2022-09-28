@@ -6,11 +6,11 @@ using UnityEngine.Rendering;
 public partial class JTRenderPipeline : RenderPipeline
 {
     private Batching _batching;
-    private PostFX _pfxSettings;
+    private PostProcessing _pp;
     private DirectionalShadowProperties _dirShadowProperties;
     private OtherShadowProperties _otherShadowProperties;
     
-    public JTRenderPipeline(Batching batching, PostFX pfxSettings, 
+    public JTRenderPipeline(Batching batching, PostProcessing pp, 
         DirectionalShadowProperties dirShadowProperties, OtherShadowProperties otherShadowProperties)
     {
         // Enable Srp Batching & GPU Instancing & Dynamic Batching 
@@ -18,7 +18,7 @@ public partial class JTRenderPipeline : RenderPipeline
         this._batching.DynamicBatching = batching.DynamicBatching;
         this._batching.GPUInstancing = batching.GPUInstancing;
         this._dirShadowProperties = dirShadowProperties;
-        this._pfxSettings = pfxSettings;
+        this._pp = pp;
         this._otherShadowProperties = otherShadowProperties;
         GraphicsSettings.lightsUseLinearIntensity = true;
         InitializeForEditor();
@@ -29,7 +29,7 @@ public partial class JTRenderPipeline : RenderPipeline
     {
         foreach (var camera in cameras)
         {
-            _cameraRender.Render(context, camera, _batching, _pfxSettings,_dirShadowProperties, _otherShadowProperties);
+            _cameraRender.Render(context, camera, _batching, _pp,_dirShadowProperties, _otherShadowProperties);
         }
     }
 }

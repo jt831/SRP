@@ -1,4 +1,4 @@
-using System;
+/*using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEditor;
@@ -23,7 +23,6 @@ public class PFXStack
         
         if (pfxSettings != null) _material = new Material(pfxSettings.shader);
     }
-
     private static int ID_GlobalTexture = Shader.PropertyToID("GlobalTex");
     public void Render(RenderTargetIdentifier src, RenderTargetIdentifier dest)
     {
@@ -37,9 +36,4 @@ public class PFXStack
         _context.ExecuteCommandBuffer(_buffer);
         _buffer.Clear();
     }
-    /*private void SetMaterial()
-    {
-        _material.SetVector("minBoxPoint", _container.position - _container.localScale / 2);
-        _material.SetVector("maxBoxPoint", _container.position + _container.localScale / 2);
-    }*/
-}
+}*/

@@ -16,9 +16,16 @@ MonoBehaviour:
     GPUInstancing: 0
     SRPBatching: 1
     DynamicBatching: 1
-  postFX:
-    active: 1
-    settings: {fileID: 11400000, guid: 68d524f726aaaf74ca165febcddc6587, type: 2}
+  postProcessing:
+    Bloom:
+      Active: 1
+      Shader: {fileID: 4800000, guid: c4ce90588fc318a429e91fc26caa6e85, type: 3}
+    Clouds:
+      Active: 0
+      shader: {fileID: 4800000, guid: bc3b7ed836c398f4bb8792e3ff14d00d, type: 3}
+      container:
+        position: {x: -80, y: 10, z: 100}
+        localScale: {x: 10, y: 5, z: 10}
   shadow:
     directional:
       distance: 200

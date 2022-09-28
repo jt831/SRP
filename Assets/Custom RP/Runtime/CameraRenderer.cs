@@ -534,8 +534,7 @@ public partial class CameraRenderer
     private OtherShadowProperties _otherShadowProperties;
     private Lighting _lighting;
     private Shadow _shadow;
-    private PFXStack _pfxStack;
-    private PostFX _pfxSettings;
+    private PostProcessing _pp;
     private float _shadowDistance;
     private static int
         ID_ViewDirection = Shader.PropertyToID("_ViewDirection"),
@@ -553,7 +552,7 @@ public partial class CameraRenderer
         "_DIRECTIONAL_PCF7"
     };
     public void Render(ScriptableRenderContext context, Camera camera, 
-        Batching batching, PostFX ppSettings, 
+        Batching batching, PostProcessing pp, 
         DirectionalShadowProperties dirShadowProperties, OtherShadowProperties otherShadowProperties)
     {
         /* 0. Render objects' shadows
@@ -569,8 +568,8 @@ public partial class CameraRenderer
         this._otherShadowProperties = otherShadowProperties;
         this._lighting = new Lighting();
         this._shadow = new Shadow();
-        this._pfxSettings = ppSettings;
-        this._pfxStack = new PFXStack(context, camera, _pfxSettings.settings);
+        this._pp = pp;
+        
         PrepareBuffer();
         if (!Culling()) return;
         RenderShadows();
@@ -586,7 +585,6 @@ public partial class CameraRenderer
     };
     private bool Culling()
     {
-        
         // Do culling and get cullingResults
         if (_camera.TryGetCullingParameters(out ScriptableCullingParameters parameters))
         {
@@ -601,7 +599,7 @@ public partial class CameraRenderer
     private void RenderShadows()
     {
         _buffer.BeginSample(BufferName);
-        ExecuteBuffer();
+        ExecuteBuffer(_buffer);
         _lighting.RenderLights(_context, _results, _dirShadowProperties, _otherShadowProperties);
         _buffer.EndSample(BufferName);
     }
@@ -610,14 +608,8 @@ public partial class CameraRenderer
         // Setup camera
         _context.SetupCameraProperties(_camera);
         // Setup pfxStack and Get FrameBuffer as the input of pfxStack
-        if (_pfxSettings.active && _pfxStack.pfxSettings != null)
-        {
-            Debug.Log("Active PFX");
-            _buffer.GetTemporaryRT(ID_FrameBuffer, _camera.pixelWidth, _camera.pixelHeight, 32, FilterMode.Bilinear, RenderTextureFormat.Default);
-            _buffer.SetRenderTarget(ID_FrameBuffer, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store);
-        }
-        
-        // Setup CommandBuffer
+        _buffer.GetTemporaryRT(ID_FrameBuffer, _camera.pixelWidth, _camera.pixelHeight, 32, FilterMode.Bilinear, RenderTextureFormat.Default);
+        _buffer.SetRenderTarget(ID_FrameBuffer, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store);
         
         _buffer.ClearRenderTarget(true, true, Color.clear);
         _buffer.BeginSample(BufferName);
@@ -663,12 +655,9 @@ public partial class CameraRenderer
         // Draw Gizmos
         DrawGizmos();
         
-        // Apply Post Effects
-        if (_pfxSettings.active && _pfxStack.pfxSettings != null)
-        {
-            _pfxStack.Render(ID_FrameBuffer, BuiltinRenderTextureType.CameraTarget);
-            CleanUp();
-        }
+        // PostProcessing
+        ApplyPostProcessing();
+        
         // Release temporalRT(As a shadowMap) before Submit
         _shadow.Cleanup();
     }
@@ -676,13 +665,13 @@ public partial class CameraRenderer
     {
         // Submit context
         _buffer.EndSample(BufferName);
-        ExecuteBuffer();
+        ExecuteBuffer(_buffer);
         _context.Submit();
     }
-    private void ExecuteBuffer()
+    private void ExecuteBuffer(CommandBuffer buffer)
     {
         // 将commandBuffer参数注册到context要执行的命令列表中，然后清空commandBuffer
-        _context.ExecuteCommandBuffer(_buffer);
+        _context.ExecuteCommandBuffer(buffer);
         _buffer.Clear();
     }
     private void SetGlobalValue(UnityEngine.Camera camera)
@@ -695,7 +684,7 @@ public partial class CameraRenderer
         _buffer.SetGlobalFloat(ID_LightWidth, _dirShadowProperties.lightWidth);
         _buffer.SetGlobalVector(ID_ShadowMapResolution, 
             new Vector4((float)_dirShadowProperties.resolution, 1.0f / (float)_dirShadowProperties.resolution));
-        ExecuteBuffer();
+        ExecuteBuffer(_buffer);
     }
     private void SetKeywords()
     {
@@ -713,5 +702,23 @@ public partial class CameraRenderer
     private void CleanUp()
     {
         _buffer.ReleaseTemporaryRT(ID_FrameBuffer);
+    }
+    private void ApplyPostProcessing()
+    {
+        // Apply Post Effects
+        if (_pp.Clouds.Active)
+        {
+            CommandBuffer buffer = new CommandBuffer() {name = "Clouds"};
+            _pp.Clouds.Render(_camera, buffer, ID_FrameBuffer, BuiltinRenderTextureType.CameraTarget);
+            ExecuteBuffer(buffer);
+            CleanUp();
+        }
+        if (_pp.Bloom.Active)
+        {
+            CommandBuffer buffer = new CommandBuffer() {name = "Bloom"};
+            _pp.Bloom.Render(buffer, ID_FrameBuffer, BuiltinRenderTextureType.CameraTarget);
+            ExecuteBuffer(buffer);
+            CleanUp();
+        }
     }
 }

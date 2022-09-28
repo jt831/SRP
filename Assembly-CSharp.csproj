@@ -61,6 +61,7 @@
      <None Include="Assets\Custom RP\Shaders\LitPass.hlsl" />
      <None Include="Assets\Fantasy Skybox FREE\Readme.txt" />
      <None Include="Assets\Custom RP\Tools\Light.hlsl" />
+     <None Include="Assets\Custom RP\Shaders\PPVolume\Bloom.shader" />
      <None Include="Assets\Fantasy Skybox FREE\ReleaseNotes.txt" />
      <None Include="Assets\Custom RP\Shaders\ShadowPass.hlsl" />
      <None Include="Assets\Custom RP\Tools\CommonTools.hlsl" />
@@ -70,7 +71,7 @@
      <None Include="Assets\Custom RP\Shaders\Unilt.shader" />
      <None Include="Assets\Custom RP\Shaders\UnlitInstance.shader" />
      <None Include="Assets\Custom RP\Shaders\Lit.shader" />
-     <None Include="Assets\Custom RP\Shaders\Cloud.shader" />
+     <None Include="Assets\Custom RP\Shaders\PPVolume\Clouds.shader" />
      <None Include="Assets\Custom RP\Tools\JTRPCommonFunc.hlsl" />
      <None Include="Assets\Custom RP\Tools\TransformTools.hlsl" />
      <None Include="Assets\Custom RP\Tools\Shadow.hlsl" />

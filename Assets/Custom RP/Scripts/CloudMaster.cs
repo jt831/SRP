@@ -1,4 +1,5 @@
-﻿using System;
+﻿/*
+using System;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
@@ -53,3 +54,4 @@ public class CloudMaster : MonoBehaviour
         _material.SetVector("minBoxPoint", _container.position - _container.localScale / 2);
     }
 }
+*/

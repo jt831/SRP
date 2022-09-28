@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using Unity.IO.LowLevel.Unsafe;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
@@ -23,7 +24,8 @@ public class JTRenderPipelineAsset : RenderPipelineAsset
         SRPBatching = true,
         DynamicBatching = false
     };
-    [SerializeField] private PostFX postFX = new PostFX();
+
+    [SerializeField] private PostProcessing postProcessing;
 
     [SerializeField] private ShadowProperties shadow;
     // Create an pipeline instance to render
@@ -31,7 +33,6 @@ public class JTRenderPipelineAsset : RenderPipelineAsset
     {
         DirectionalShadowProperties directionalShadow = shadow.directional;
         OtherShadowProperties otherShadow = shadow.other;
-        return new JTRenderPipeline(batching, postFX, directionalShadow, otherShadow);
+        return new JTRenderPipeline(batching, postProcessing, directionalShadow, otherShadow);
     }
-    
 }
