@@ -536,6 +536,7 @@ public partial class CameraRenderer
     private Shadow _shadow;
     private PostProcessing _pp;
     private float _shadowDistance;
+
     private static int
         ID_ViewDirection = Shader.PropertyToID("_ViewDirection"),
         ID_ShadowMapResolution = Shader.PropertyToID("_ShadowMapResolution"),
@@ -543,7 +544,8 @@ public partial class CameraRenderer
         ID_Fade = Shader.PropertyToID("_Fade"),
         ID_SampleBlockerDepthRadius = Shader.PropertyToID("_SampleBlockerDepthRadius"),
         ID_LightWidth = Shader.PropertyToID("_LightWidth"),
-        ID_FrameBuffer = Shader.PropertyToID("_CameraFrameBuffer");
+        ID_FrameBuffer = Shader.PropertyToID("_CameraFrameBuffer"),
+        ID_FrameBuffer1 = Shader.PropertyToID("_CameraFrameBuffer1");
     public static string[] filterKeywords =
     {
         "_DIRECTIONAL_PCSS",
@@ -608,9 +610,12 @@ public partial class CameraRenderer
         // Setup camera
         _context.SetupCameraProperties(_camera);
         // Setup pfxStack and Get FrameBuffer as the input of pfxStack
-        _buffer.GetTemporaryRT(ID_FrameBuffer, _camera.pixelWidth, _camera.pixelHeight, 32, FilterMode.Bilinear, RenderTextureFormat.Default);
-        _buffer.SetRenderTarget(ID_FrameBuffer, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store);
-        
+        if (EnablePostProcessing())
+        {
+            _buffer.GetTemporaryRT(ID_FrameBuffer, _camera.pixelWidth, _camera.pixelHeight, 32, FilterMode.Bilinear, RenderTextureFormat.Default);
+            _buffer.SetRenderTarget(ID_FrameBuffer, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store);
+            _buffer.GetTemporaryRT(ID_FrameBuffer1, _camera.pixelWidth, _camera.pixelHeight, 32, FilterMode.Bilinear, RenderTextureFormat.Default);
+        }
         _buffer.ClearRenderTarget(true, true, Color.clear);
         _buffer.BeginSample(BufferName);
         SetGlobalValue(_camera);
@@ -703,22 +708,30 @@ public partial class CameraRenderer
     {
         _buffer.ReleaseTemporaryRT(ID_FrameBuffer);
     }
+
+    private bool EnablePostProcessing()
+    {
+        return _pp.Bloom.Active || _pp.Clouds.Active;
+    }
     private void ApplyPostProcessing()
     {
         // Apply Post Effects
         if (_pp.Clouds.Active)
         {
             CommandBuffer buffer = new CommandBuffer() {name = "Clouds"};
-            _pp.Clouds.Render(_camera, buffer, ID_FrameBuffer, BuiltinRenderTextureType.CameraTarget);
+            buffer.BeginSample("Clouds");
+            _pp.Clouds.Render(buffer,_camera,  ID_FrameBuffer, BuiltinRenderTextureType.CameraTarget);
+            buffer.EndSample("Clouds");
             ExecuteBuffer(buffer);
-            CleanUp();
         }
         if (_pp.Bloom.Active)
         {
             CommandBuffer buffer = new CommandBuffer() {name = "Bloom"};
-            _pp.Bloom.Render(buffer, ID_FrameBuffer, BuiltinRenderTextureType.CameraTarget);
+            buffer.BeginSample("Bloom");
+            _pp.Bloom.Render(buffer, _camera, ID_FrameBuffer, BuiltinRenderTextureType.CameraTarget);
+            buffer.EndSample("Bloom");
             ExecuteBuffer(buffer);
-            CleanUp();
         }
+        CleanUp();
     }
 }

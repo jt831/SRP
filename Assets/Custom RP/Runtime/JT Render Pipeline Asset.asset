@@ -20,6 +20,7 @@ MonoBehaviour:
     Bloom:
       Active: 1
       Shader: {fileID: 4800000, guid: c4ce90588fc318a429e91fc26caa6e85, type: 3}
+      Blur: 5
     Clouds:
       Active: 0
       shader: {fileID: 4800000, guid: bc3b7ed836c398f4bb8792e3ff14d00d, type: 3}
