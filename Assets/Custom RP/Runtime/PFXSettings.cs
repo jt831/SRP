@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.Serialization;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.Analytics;
 using UnityEngine.Experimental.Rendering;
@@ -18,50 +19,71 @@ public class PostProcessing
 public class Bloom
 {
     // Menu
-    public bool Active = false;
-    public Shader Shader;
-    [Range(0, 8)]
-    public int Blur = 5;
+    [HideInInspector]public bool active = false;
+    public Shader shader;
+    [Range(0, 1)] public float threshold = 0.2f;
+    public float intensity = 0.5f;
+    [Range(0, 1)] public float scatter = 0.5f;
+    [ColorUsage(true, true)] public Color color = Color.white;
+    
     // Properties
     private Material _material;
     private CommandBuffer _buffer;
     private Camera _camera;
-
+    [Range(1, Single.MaxValue)] private int _downSample = 4;
+    private enum Pass
+    {
+        Default, Blur, Bloom, Dark
+    }
     public void Render(CommandBuffer buffer, Camera camera, RenderTargetIdentifier src, RenderTargetIdentifier dest)
     {
         _buffer = buffer;
         _camera = camera;
-        _material = new Material(Shader);
-        BlurSrcTexture(camera.pixelWidth, camera.pixelHeight, src, dest);
+        _material = new Material(shader);
+        Blur(camera.pixelWidth, camera.pixelHeight, src, dest);
     }
-    private void BlurSrcTexture(int srcWidth, int srcHeight, RenderTargetIdentifier src, RenderTargetIdentifier dest)
+    private void Blur(int srcWidth, int srcHeight, RenderTargetIdentifier src, RenderTargetIdentifier dest)
     {
-        Vector4 texelSize = new Vector4(1 / srcWidth, 1 / srcHeight, 0, 0);
-        _buffer.SetGlobalVector("_TexelSize", texelSize);
-        
-        int ID_MipMap = Shader.PropertyToID("MipMap" + 0);
-        _buffer.GetTemporaryRT(ID_MipMap, srcWidth, srcHeight, 32, FilterMode.Bilinear, RenderTextureFormat.Default);
-        _buffer.Blit(src, ID_MipMap, _material, 0);
-        // Down the resolution of srcTex
-        for (int i = 1; i < Blur; i++)
+        int blur = (int) (scatter * 10);
+        var srcID = src;
+        // Setup material //
+        Vector4 texelSize = new Vector4(1f / srcWidth, 1f / srcHeight, 0, 0);
+        _buffer.SetGlobalVector("_BloomTexelSize", texelSize);
+        _buffer.SetGlobalVector("_BloomColor", color);
+        _buffer.SetGlobalFloat("_BloomWeight", intensity);
+        _buffer.SetGlobalFloat("_BloomDownSample", _downSample);
+        _buffer.SetGlobalFloat("_BloomThreshold", threshold);
+        // Down sample //
+        srcHeight /= _downSample;
+        srcWidth /= _downSample;
+        // Dark srcRT //
+        int ID_DarkMap = Shader.PropertyToID("DarkMap");
+        _buffer.SetGlobalTexture("BloomDarkTex", src);
+        _buffer.GetTemporaryRT(ID_DarkMap, srcWidth, srcHeight, 0, FilterMode.Bilinear, RenderTextureFormat.Default);
+        _buffer.Blit(src, ID_DarkMap, _material, (int)Pass.Dark);
+        src = ID_DarkMap;
+        // Blur srcRT //
+        for (int i = 0; i < blur; i++)
         {
-            srcHeight /= 2;
-            srcWidth /= 2;
-            _buffer.SetGlobalTexture("BloomSrcTex", src);
-            ID_MipMap = Shader.PropertyToID("MipMap" + i);
-            _buffer.GetTemporaryRT(ID_MipMap, srcWidth, srcHeight, 32, FilterMode.Bilinear, RenderTextureFormat.Default);
-            _buffer.SetRenderTarget(ID_MipMap, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store);
-            //_buffer.DrawProcedural(Matrix4x4.identity, _material, 0, MeshTopology.Triangles, 3);
-            _buffer.Blit(src, ID_MipMap, _material, 1);
-            src = ID_MipMap;
+            int ID_BlurMap = Shader.PropertyToID("BlurMap" + i);
+            _buffer.SetGlobalTexture("BloomBlurTex", src);
+            _buffer.GetTemporaryRT(ID_BlurMap, srcWidth, srcHeight, 0, FilterMode.Bilinear, RenderTextureFormat.Default);
+            _buffer.Blit(src, ID_BlurMap, _material, (int)Pass.Blur);
+            src = ID_BlurMap;
         }
+        // Bloom srcRT //
+        _buffer.SetGlobalTexture("BloomSrcTex", srcID);
+        _buffer.SetGlobalTexture("BloomBlurTex", src);
+        int ID_BloomMap = Shader.PropertyToID("BloomMap");
+        _buffer.GetTemporaryRT(ID_BloomMap, srcWidth, srcHeight, 0, FilterMode.Bilinear, RenderTextureFormat.Default);
+        _buffer.Blit(src, ID_BloomMap, _material, (int)Pass.Bloom);
+        src = ID_BloomMap;
+        // Release TemporalRT //
+        /*for (int i = blur - 1; i >= 0; i--) 
+            _buffer.ReleaseTemporaryRT(Shader.PropertyToID("BlurMap" + i));*/
+        // Render srcRT to Camera //
         _buffer.SetGlobalTexture("BloomSrcTex", src);
-        _buffer.Blit(src, dest, _material, 0);
-
-        for (int i = Blur - 1; i >= 0; i--)
-        {
-            _buffer.ReleaseTemporaryRT(Shader.PropertyToID("MipMap" + i));
-        }
+        _buffer.Blit(src, dest, _material, (int)Pass.Default);
     }
 }
 
@@ -69,7 +91,7 @@ public class Bloom
 public class Clouds
 {
     // Menu
-    public bool Active = false;
+    public bool active = false;
     public Shader shader;
     [Serializable]
     public struct Container

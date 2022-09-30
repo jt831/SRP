@@ -18,11 +18,14 @@ MonoBehaviour:
     DynamicBatching: 1
   postProcessing:
     Bloom:
-      Active: 1
-      Shader: {fileID: 4800000, guid: c4ce90588fc318a429e91fc26caa6e85, type: 3}
-      Blur: 5
+      active: 1
+      shader: {fileID: 4800000, guid: c4ce90588fc318a429e91fc26caa6e85, type: 3}
+      threshold: 0.583
+      intensity: 2.07
+      scatter: 0.429
+      color: {r: 0.9716981, g: 0.28300565, b: 0.06111298, a: 1}
     Clouds:
-      Active: 0
+      active: 1
       shader: {fileID: 4800000, guid: bc3b7ed836c398f4bb8792e3ff14d00d, type: 3}
       container:
         position: {x: -80, y: 10, z: 100}

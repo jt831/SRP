@@ -1,4 +1,5 @@
 using System;
+using TMPro;
 using UnityEngine;
 using UnityEngine.Rendering;
 using Unity.Collections;
@@ -711,12 +712,15 @@ public partial class CameraRenderer
 
     private bool EnablePostProcessing()
     {
-        return _pp.Bloom.Active || _pp.Clouds.Active;
+        if (_pp.Bloom.shader == Shader.Find("Bloom") ) _pp.Bloom.active = true;
+        if (_pp.Clouds.shader == Shader.Find("Clouds") ) _pp.Clouds.active = true;
+
+        return _pp.Clouds.active || _pp.Bloom.active;
     }
     private void ApplyPostProcessing()
     {
         // Apply Post Effects
-        if (_pp.Clouds.Active)
+        if (_pp.Clouds.active)
         {
             CommandBuffer buffer = new CommandBuffer() {name = "Clouds"};
             buffer.BeginSample("Clouds");
@@ -724,7 +728,7 @@ public partial class CameraRenderer
             buffer.EndSample("Clouds");
             ExecuteBuffer(buffer);
         }
-        if (_pp.Bloom.Active)
+        if (_pp.Bloom.active)
         {
             CommandBuffer buffer = new CommandBuffer() {name = "Bloom"};
             buffer.BeginSample("Bloom");
