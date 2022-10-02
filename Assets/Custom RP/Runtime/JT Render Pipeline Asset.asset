@@ -20,16 +20,20 @@ MonoBehaviour:
     Bloom:
       active: 1
       shader: {fileID: 4800000, guid: c4ce90588fc318a429e91fc26caa6e85, type: 3}
-      threshold: 0.583
-      intensity: 2.07
-      scatter: 0.429
-      color: {r: 0.9716981, g: 0.28300565, b: 0.06111298, a: 1}
+      threshold: 0.622
+      intensity: 1.12
+      scatter: 0.238
+      color: {r: 0.9528302, g: 0.29728305, b: 0, a: 1}
     Clouds:
       active: 1
       shader: {fileID: 4800000, guid: bc3b7ed836c398f4bb8792e3ff14d00d, type: 3}
       container:
         position: {x: -80, y: 10, z: 100}
         localScale: {x: 10, y: 5, z: 10}
+    AwakeEyes:
+      active: 1
+      shader: {fileID: 4800000, guid: b16e7c452b0a6564d899f1468f58a044, type: 3}
+      processing: 1
   shadow:
     directional:
       distance: 200

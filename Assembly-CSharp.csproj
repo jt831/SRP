@@ -56,6 +56,7 @@
      <Compile Include="Assets\Custom RP\Scripts\ManyInstances.cs" />
      <Compile Include="Assets\Custom RP\Scripts\ShadowPropertiescs.cs" />
      <None Include="Assets\Custom RP\Shaders\UnlitPass.hlsl" />
+     <None Include="Assets\Custom RP\Shaders\PPVolume\AwakeEyes.shader" />
      <None Include="Assets\Custom RP\Tools\GI.hlsl" />
      <None Include="Assets\Custom RP\Shaders\UnlitInstancePass.hlsl" />
      <None Include="Assets\Custom RP\Shaders\LitPass.hlsl" />

@@ -51,4 +51,8 @@ float4 GetFinalColor(float4 BaseColor,
 {
     return BaseColor * LightedColor + EmissionColor;
 }
+float2 filpUV(float2 uv)
+{
+    return float2(uv.x, 1 - uv.y);
+}
 #endif

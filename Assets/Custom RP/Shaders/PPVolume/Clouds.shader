@@ -27,7 +27,7 @@ Shader "Hidden/JTRP/PP/Clouds"
            float3 camDir;
            CBUFFER_END
            
-           TEXTURE2D(GlobalTex);   SAMPLER(sampler_GlobalTex);
+           TEXTURE2D(CloudsSrcTex);   SAMPLER(sampler_CloudsSrcTex);
            
            struct Attributes
            {
@@ -86,7 +86,7 @@ Shader "Hidden/JTRP/PP/Clouds"
            
            float4 VolumeCloudPassFragment(v2f input) : SV_Target
            {
-               float4 finalColor = SAMPLE_TEXTURE2D_LOD(GlobalTex, sampler_GlobalTex, input.uv, 0);
+               float4 finalColor = SAMPLE_TEXTURE2D_LOD(CloudsSrcTex, sampler_CloudsSrcTex, input.uv, 0);
                float3 lightPos = _WorldSpaceCameraPos;
                float3 lightDir = normalize(input.viewDir);
                float2 ray2ContainerInfo = GetRayToContainerInfo(minBoxPoint, maxBoxPoint, lightPos, lightDir);

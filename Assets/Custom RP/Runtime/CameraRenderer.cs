@@ -714,8 +714,9 @@ public partial class CameraRenderer
     {
         if (_pp.Bloom.shader == Shader.Find("Bloom") ) _pp.Bloom.active = true;
         if (_pp.Clouds.shader == Shader.Find("Clouds") ) _pp.Clouds.active = true;
+        if (_pp.AwakeEyes.shader == Shader.Find("AwakeEyes") ) _pp.AwakeEyes.active = true;
 
-        return _pp.Clouds.active || _pp.Bloom.active;
+        return _pp.Clouds.active || _pp.Bloom.active || _pp.AwakeEyes.active;
     }
     private void ApplyPostProcessing()
     {
@@ -734,6 +735,14 @@ public partial class CameraRenderer
             buffer.BeginSample("Bloom");
             _pp.Bloom.Render(buffer, _camera, ID_FrameBuffer, BuiltinRenderTextureType.CameraTarget);
             buffer.EndSample("Bloom");
+            ExecuteBuffer(buffer);
+        }
+        if (_pp.AwakeEyes.active)
+        {
+            CommandBuffer buffer = new CommandBuffer() {name = "AwakeEyes"};
+            buffer.BeginSample("AwakeEyes");
+            _pp.AwakeEyes.Render(buffer, _camera, ID_FrameBuffer, BuiltinRenderTextureType.CameraTarget);
+            buffer.EndSample("AwakeEyes");
             ExecuteBuffer(buffer);
         }
         CleanUp();
