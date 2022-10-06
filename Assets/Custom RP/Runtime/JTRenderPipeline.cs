@@ -29,7 +29,8 @@ public partial class JTRenderPipeline : RenderPipeline
     {
         foreach (var camera in cameras)
         {
-            _cameraRender.Render(context, camera, _batching, _pp,_dirShadowProperties, _otherShadowProperties);
+            camera.depthTextureMode = DepthTextureMode.Depth;
+            _cameraRender.Render(context, camera, _batching, _pp, _dirShadowProperties, _otherShadowProperties);
         }
     }
 }

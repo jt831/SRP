@@ -1,0 +1,234 @@
+// Each #kernel tells which function to compile; you can have many kernels
+/*#pragma kernel CSMain
+static const int numThreads = 8;
+// Create a RenderTexture with enableRandomWrite flag and set it
+// with cs.SetTexture
+RWTexture3D<float4> Result;
+StructuredBuffer<float3> points;
+
+int resolution;
+int numPointsPerAxis;
+
+static const int3 offsets[] =
+{
+    // center
+    int3(0,0,0),
+    // front face
+    int3(0,0,1),
+    int3(-1,1,1),
+    int3(-1,0,1),
+    int3(-1,-1,1),
+    int3(0,1,1),
+    int3(0,-1,1),
+    int3(1,1,1),
+    int3(1,0,1),
+    int3(1,-1,1),
+    // back face
+    int3(0,0,-1),
+    int3(-1,1,-1),
+    int3(-1,0,-1),
+    int3(-1,-1,-1),
+    int3(0,1,-1),
+    int3(0,-1,-1),
+    int3(1,1,-1),
+    int3(1,0,-1),
+    int3(1,-1,-1),
+    // ring around centre
+    int3(-1,1,0),
+    int3(-1,0,0),
+    int3(-1,-1,0),
+    int3(0,1,0),
+    int3(0,-1,0),
+    int3(1,1,0),
+    int3(1,0,0),
+    int3(1,-1,0)
+};
+float maxComponent(float3 vec) {
+    return max(vec.x, max(vec.y, vec.z));
+}
+
+float minComponent(float3 vec) {
+    return min(vec.x, min(vec.y, vec.z));
+}
+
+float Square(float input)
+{
+    return input * input;
+}
+
+float GetMinDistance(StructuredBuffer<float3> points, int numCells, float3 samplePos)
+{
+    float minDis = 1;
+    int3 center = (int)floor(samplePos * numCells);
+    for (int i = 0; i < 3 * 9; i++)
+    {
+        int3 index3D = center + offsets[i];
+        int index = max(0, numCells * numCells * index3D.x + numCells * index3D.y + index3D.z);
+        minDis = min(minDis, length(samplePos - points[index]));
+    }
+    return minDis;
+}
+
+float worley(StructuredBuffer<float3> points, int numCells, float3 samplePos) {
+    int3 cellID = floor(samplePos * numCells);
+    float minSqrDst = 1;
+
+    // Loop over current cell + 26 adjacent cells to find closest point to samplePos
+    for (int cellOffsetIndex = 0; cellOffsetIndex < 27; cellOffsetIndex ++) {
+        int3 adjID = cellID + offsets[cellOffsetIndex];
+        // Adjacent cell is outside map, so wrap around to other side to allow for seamless tiling
+        if (minComponent(adjID) == -1 || maxComponent(adjID) == numCells) {
+            int3 wrappedID = (adjID + numCells) % (uint3)numCells;
+            int adjCellIndex = wrappedID.x + numCells * numCells * adjID.x + numCells * adjID.y + adjID.z;
+            float3 wrappedPoint = points[adjCellIndex];
+            // Offset the wrappedPoint by all offsets to find which is closest to samplePos
+            for (int wrapOffsetIndex = 0; wrapOffsetIndex < 27; wrapOffsetIndex ++) {
+                float3 sampleOffset = (samplePos - (wrappedPoint + offsets[wrapOffsetIndex]));
+                minSqrDst = min(minSqrDst, dot(sampleOffset, sampleOffset));
+            }
+        }
+        // Adjacent cell is inside map, so calculate sqrDst from samplePos to cell point
+        else {
+            int adjCellIndex = numCells * numCells * adjID.x + numCells * adjID.y + adjID.z;
+            float3 sampleOffset = samplePos - points[adjCellIndex];
+            minSqrDst = min(minSqrDst, dot(sampleOffset, sampleOffset));
+        }
+    }
+    return sqrt(minSqrDst);
+}
+
+[numthreads(numThreads,numThreads,numThreads)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    float3 samplePos = id / (float)resolution;
+    float distance = worley(points, numPointsPerAxis, samplePos);
+    Result[id] += float4(0, 1, 0, 0) * distance;
+}*/
+#pragma kernel CSSetWorleyTex3D
+#pragma kernel CSNormalize
+
+static const int numThreads = 8;
+static const int minMaxAccuracy = 10000000;
+
+uint resolution;
+uint numWorley;
+float4 channelMask;
+bool invertNoise;
+RWTexture3D<float4> Result;
+RWStructuredBuffer<int> minMaxWorley;
+// Settings
+StructuredBuffer<float3> points0;
+float weight0;
+int pointsPerAxis0;
+StructuredBuffer<float3> points1;
+float weight1;
+int pointsPerAxis1;
+StructuredBuffer<float3> points2;
+float weight2;
+int pointsPerAxis2;
+
+
+static const int3 offsets[] =
+{
+    // centre
+    int3(0,0,0),
+    // front face
+    int3(0,0,1),
+    int3(-1,1,1),
+    int3(-1,0,1),
+    int3(-1,-1,1),
+    int3(0,1,1),
+    int3(0,-1,1),
+    int3(1,1,1),
+    int3(1,0,1),
+    int3(1,-1,1),
+    // back face
+    int3(0,0,-1),
+    int3(-1,1,-1),
+    int3(-1,0,-1),
+    int3(-1,-1,-1),
+    int3(0,1,-1),
+    int3(0,-1,-1),
+    int3(1,1,-1),
+    int3(1,0,-1),
+    int3(1,-1,-1),
+    // ring around centre
+    int3(-1,1,0),
+    int3(-1,0,0),
+    int3(-1,-1,0),
+    int3(0,1,0),
+    int3(0,-1,0),
+    int3(1,1,0),
+    int3(1,0,0),
+    int3(1,-1,0)
+};
+
+float maxComponent(float3 vec) {
+    return max(vec.x, max(vec.y, vec.z));
+}
+float minComponent(float3 vec) {
+    return min(vec.x, min(vec.y, vec.z));
+}
+float GetWorleyTex3D(StructuredBuffer<float3> points, int pointsPerAxis, float3 samplePos) {
+    int3 cellID = floor(samplePos * pointsPerAxis);
+    float minSqrDst = 1;
+
+    // Loop over current cell + 26 adjacent cells to find closest point to samplePos
+    for (int cellOffsetIndex = 0; cellOffsetIndex < 27; cellOffsetIndex ++) {
+        int3 adjID = cellID + offsets[cellOffsetIndex];
+        // Adjacent cell is outside map, so wrap around to other side to allow for seamless tiling
+        if (minComponent(adjID) == -1 || maxComponent(adjID) == pointsPerAxis) {
+            int3 wrappedID = (adjID + pointsPerAxis) % (uint3)pointsPerAxis;
+            int adjCellIndex = wrappedID.x + pointsPerAxis * pointsPerAxis * adjID.x + pointsPerAxis * adjID.y + adjID.z;
+            float3 wrappedPoint = points[adjCellIndex];
+            // Offset the wrappedPoint by all offsets to find which is closest to samplePos
+            for (int wrapOffsetIndex = 0; wrapOffsetIndex < 27; wrapOffsetIndex ++) {
+                float3 sampleOffset = (samplePos - (wrappedPoint + offsets[wrapOffsetIndex]));
+                minSqrDst = min(minSqrDst, dot(sampleOffset, sampleOffset));
+            }
+        }
+        // Adjacent cell is inside map, so calculate sqrDst from samplePos to cell point
+        else {
+            int adjCellIndex = pointsPerAxis * pointsPerAxis * adjID.x + pointsPerAxis * adjID.y + adjID.z;
+            float3 sampleOffset = samplePos - points[adjCellIndex];
+            minSqrDst = min(minSqrDst, dot(sampleOffset, sampleOffset));
+        }
+    }
+    return sqrt(minSqrDst);
+}
+
+[numthreads(numThreads, numThreads, numThreads)]
+void CSSetWorleyTex3D (uint3 id : SV_DispatchThreadID)
+{
+    // Get all worley val
+    float3 samplePoint = id / (float)resolution;
+    float worley01 = GetWorleyTex3D(points1, pointsPerAxis1, samplePoint);
+    float worley02 = GetWorleyTex3D(points2, pointsPerAxis2, samplePoint);
+    float worley03 = GetWorleyTex3D(points0, pointsPerAxis0, samplePoint);
+    // Normalize worley
+    float sumWorley = weight1 * worley01 + weight2 * worley02 + weight0 * worley03;
+    float sumWeight = weight1 + weight2 + weight0;
+    float worley = sumWorley / sumWeight;
+    
+    if (invertNoise) worley = 1 - worley;
+    
+    // Keep track of min and max val of worley
+    int storedWorley = (int)(worley * minMaxAccuracy);
+    InterlockedMin(minMaxWorley[0], storedWorley);
+    InterlockedMax(minMaxWorley[1], storedWorley);
+    // Store val of worley
+    Result[id] = (1 - channelMask) * Result[id] + channelMask * worley;
+}
+
+[numthreads(numThreads,numThreads,numThreads)]
+void CSNormalize (uint3 id : SV_DispatchThreadID)
+{
+    // As most of vals of the NoiseTex created by CSWorley maybe close to 1(After inverted).
+    // So we normalize it to clear the difference between vals.
+    float minVal = (float)minMaxWorley[0] / minMaxAccuracy;
+    float maxVal = (float)minMaxWorley[1] / minMaxAccuracy;
+    float4 normalizedVal = (Result[id]-minVal) / (maxVal-minVal);
+
+    
+    Result[id] = (1 - channelMask) * Result[id] + channelMask * normalizedVal;
+}

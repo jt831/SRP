@@ -19,32 +19,58 @@ MonoBehaviour:
   postProcessing:
     Bloom:
       active: 1
-      shader: {fileID: 4800000, guid: c4ce90588fc318a429e91fc26caa6e85, type: 3}
       threshold: 0.622
-      intensity: 1.12
+      intensity: 0
       scatter: 0.238
       color: {r: 0.9528302, g: 0.29728305, b: 0, a: 1}
+      shader: {fileID: 4800000, guid: c4ce90588fc318a429e91fc26caa6e85, type: 3}
     Clouds:
       active: 1
-      shader: {fileID: 4800000, guid: bc3b7ed836c398f4bb8792e3ff14d00d, type: 3}
+      cloudScale: 11.07
       container:
         position: {x: -80, y: 10, z: 100}
-        localScale: {x: 10, y: 5, z: 10}
+        localScale: {x: 400, y: 200, z: 400}
+      numStepsLight: 8
+      rayOffsetStrength: 0
+      blueNoise: {fileID: 0}
+      densityMultiplier: 0.38
+      densityOffset: 0
+      shapeOffset: {x: 0, y: 0, z: 0}
+      heightOffset: {x: 0, y: 0}
+      shapeNoiseWeights: {x: 2.03, y: 0.04, z: 0.09, w: 0}
+      detailNoiseScale: 9.25
+      detailNoiseWeight: 0.1
+      detailNoiseWeights: {x: 0, y: 0, z: 0}
+      detailOffset: {x: 0, y: 0, z: 0}
+      lightAbsorptionThroughCloud: 1.35
+      lightAbsorptionTowardSun: 4.25
+      darknessThreshold: 0.641
+      forwardScattering: 0.781
+      backScattering: 0.614
+      baseBrightness: 0.767
+      phaseFactor: 0.249
+      timeScale: 0.97
+      baseSpeed: 2
+      detailSpeed: 2
+      colA: {r: 0.009433985, g: 0.009433985, b: 0.009433985, a: 0}
+      colB: {r: 0, g: 0, b: 0, a: 0}
+      material: {fileID: 0}
+      shader: {fileID: 4800000, guid: bc3b7ed836c398f4bb8792e3ff14d00d, type: 3}
     AwakeEyes:
       active: 1
-      shader: {fileID: 4800000, guid: b16e7c452b0a6564d899f1468f58a044, type: 3}
       processing: 1
+      shader: {fileID: 4800000, guid: b16e7c452b0a6564d899f1468f58a044, type: 3}
   shadow:
     directional:
       distance: 200
-      resolution: 8192
+      resolution: 4096
       Fliter: 0
       fade: 0.5
       shadowSlopBias: 0.5
       sampleBlockerDepthRadius: 0.001
       lightWidth: 0.001
       cascade:
-        count: 4
+        count: 1
         ratio1: 0.1
         ratio2: 0.3
         ratio3: 0.7

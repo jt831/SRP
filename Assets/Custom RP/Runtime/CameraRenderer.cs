@@ -545,8 +545,7 @@ public partial class CameraRenderer
         ID_Fade = Shader.PropertyToID("_Fade"),
         ID_SampleBlockerDepthRadius = Shader.PropertyToID("_SampleBlockerDepthRadius"),
         ID_LightWidth = Shader.PropertyToID("_LightWidth"),
-        ID_FrameBuffer = Shader.PropertyToID("_CameraFrameBuffer"),
-        ID_FrameBuffer1 = Shader.PropertyToID("_CameraFrameBuffer1");
+        ID_FrameBuffer = Shader.PropertyToID("_CameraFrameBuffer");
     public static string[] filterKeywords =
     {
         "_DIRECTIONAL_PCSS",
@@ -611,12 +610,9 @@ public partial class CameraRenderer
         // Setup camera
         _context.SetupCameraProperties(_camera);
         // Setup pfxStack and Get FrameBuffer as the input of pfxStack
-        if (EnablePostProcessing())
-        {
-            _buffer.GetTemporaryRT(ID_FrameBuffer, _camera.pixelWidth, _camera.pixelHeight, 32, FilterMode.Bilinear, RenderTextureFormat.Default);
-            _buffer.SetRenderTarget(ID_FrameBuffer, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store);
-            _buffer.GetTemporaryRT(ID_FrameBuffer1, _camera.pixelWidth, _camera.pixelHeight, 32, FilterMode.Bilinear, RenderTextureFormat.Default);
-        }
+        _buffer.GetTemporaryRT(ID_FrameBuffer, _camera.pixelWidth, _camera.pixelHeight, 32, FilterMode.Bilinear, RenderTextureFormat.Default);
+        _buffer.SetRenderTarget(ID_FrameBuffer, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store);
+        if (!EnablePostProcessing()) _buffer.Blit(ID_FrameBuffer, BuiltinRenderTextureType.CameraTarget);
         _buffer.ClearRenderTarget(true, true, Color.clear);
         _buffer.BeginSample(BufferName);
         SetGlobalValue(_camera);
@@ -709,31 +705,21 @@ public partial class CameraRenderer
     {
         _buffer.ReleaseTemporaryRT(ID_FrameBuffer);
     }
-
     private bool EnablePostProcessing()
     {
-        if (_pp.Bloom.shader == Shader.Find("Bloom") ) _pp.Bloom.active = true;
+        if (_pp.Bloom.shader == Shader.Find("Bloom") ) _pp.Bloom.active = false;
         if (_pp.Clouds.shader == Shader.Find("Clouds") ) _pp.Clouds.active = true;
-        if (_pp.AwakeEyes.shader == Shader.Find("AwakeEyes") ) _pp.AwakeEyes.active = true;
+        if (_pp.AwakeEyes.shader == Shader.Find("AwakeEyes") ) _pp.AwakeEyes.active = false;
 
         return _pp.Clouds.active || _pp.Bloom.active || _pp.AwakeEyes.active;
     }
     private void ApplyPostProcessing()
     {
-        // Apply Post Effects
-        if (_pp.Clouds.active)
-        {
-            CommandBuffer buffer = new CommandBuffer() {name = "Clouds"};
-            buffer.BeginSample("Clouds");
-            _pp.Clouds.Render(buffer,_camera,  ID_FrameBuffer, BuiltinRenderTextureType.CameraTarget);
-            buffer.EndSample("Clouds");
-            ExecuteBuffer(buffer);
-        }
         if (_pp.Bloom.active)
         {
             CommandBuffer buffer = new CommandBuffer() {name = "Bloom"};
             buffer.BeginSample("Bloom");
-            _pp.Bloom.Render(buffer, _camera, ID_FrameBuffer, BuiltinRenderTextureType.CameraTarget);
+            _pp.Bloom.Render(buffer, _camera,ID_FrameBuffer,BuiltinRenderTextureType.CameraTarget);
             buffer.EndSample("Bloom");
             ExecuteBuffer(buffer);
         }
@@ -741,8 +727,17 @@ public partial class CameraRenderer
         {
             CommandBuffer buffer = new CommandBuffer() {name = "AwakeEyes"};
             buffer.BeginSample("AwakeEyes");
-            _pp.AwakeEyes.Render(buffer, _camera, ID_FrameBuffer, BuiltinRenderTextureType.CameraTarget);
+            _pp.AwakeEyes.Render(buffer, _camera,ID_FrameBuffer,BuiltinRenderTextureType.CameraTarget);
             buffer.EndSample("AwakeEyes");
+            ExecuteBuffer(buffer);
+        }
+        // Apply Post Effects
+        if (_pp.Clouds.active)
+        {
+            CommandBuffer buffer = new CommandBuffer() {name = "Clouds"};
+            buffer.BeginSample("Clouds");
+            _pp.Clouds.Render(buffer, _camera,_results.visibleLights, ID_FrameBuffer,BuiltinRenderTextureType.CameraTarget);
+            buffer.EndSample("Clouds");
             ExecuteBuffer(buffer);
         }
         CleanUp();

@@ -1,0 +1,11 @@
+#pragma kernel CSMain
+
+static const int numThreads = 8;
+RWTexture3D<float4> src;
+RWTexture3D<float4> dest;
+ 
+[numthreads(numThreads, numThreads, numThreads)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    dest[id] = src[id];
+}

@@ -373,6 +373,10 @@
 "Assets/Custom RP/Scripts/PFXStack.cs"
 "Assets/Custom RP/Scripts/ShadowPropertiescs.cs"
 "Assets/Custom RP/Scripts/VarMaterial.cs"
+"Assets/Custom RP/Scripts/WorleyNoise/NoiseGenerator.cs"
+"Assets/Custom RP/Scripts/WorleyNoise/NoiseGeneratorGUI.cs"
+"Assets/Custom RP/Scripts/WorleyNoise/Save3D.cs"
+"Assets/Custom RP/Scripts/WorleyNoise/Settings/WorleyNoiseSettings.cs"
 -langversion:9.0
 
 /deterministic

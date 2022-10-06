@@ -55,4 +55,7 @@ float2 filpUV(float2 uv)
 {
     return float2(uv.x, 1 - uv.y);
 }
+float remap(float v, float minOld, float maxOld, float minNew, float maxNew) {
+    return minNew + (v-minOld) * (maxNew - minNew) / (maxOld-minOld);
+}
 #endif
